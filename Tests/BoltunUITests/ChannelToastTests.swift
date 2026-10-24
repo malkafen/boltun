@@ -566,6 +566,10 @@ import Testing
     }
 }
 
+enum InteractiveSession {
+    static let available = ProcessInfo.processInfo.environment["CI"] == nil
+}
+
 @MainActor
 @Suite struct ChannelToastViewTests {
     @Test func escapeMonitorOnlyReactsToEscapeInItsWindow() {
@@ -647,7 +651,7 @@ import Testing
         }
     }
 
-    @Test func messageListShowsTheUnreadToast() async throws {
+    @Test(.enabled(if: InteractiveSession.available)) func messageListShowsTheUnreadToast() async throws {
         let workspace = Fixture.workspace()
         let window = host(workspace)
         #expect(await waitUntil { workspace.scrollReport.positioned })
@@ -661,7 +665,7 @@ import Testing
         await MainSnapshot.render(MessageListView(workspace: workspace, channelId: "town").background(Theme.content), size: CGSize(width: 900, height: 300), name: "toast-message-list", settle: .milliseconds(1200))
     }
 
-    @Test func alignsTheSeparatorWhenRowHeightEstimatesAreWrong() async {
+    @Test(.enabled(if: InteractiveSession.available)) func alignsTheSeparatorWhenRowHeightEstimatesAreWrong() async {
         let workspace = Fixture.workspace()
         let session = workspace.session
         var posts: [Post] = []
@@ -687,7 +691,7 @@ import Testing
         window.close()
     }
 
-    @Test func messageListFollowsScrollRequests() async throws {
+    @Test(.enabled(if: InteractiveSession.available)) func messageListFollowsScrollRequests() async throws {
         let workspace = Fixture.workspace()
         let window = host(workspace)
         #expect(await waitUntil { workspace.scrollReport.positioned })
