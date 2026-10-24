@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to (re)build, e.g. v0.1.0
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & publish
+    runs-on: macos-26
+    timeout-minutes: 40
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Test
+        run: scripts/test.sh
+
+      - name: Build app bundle
+        run: |
+          VERSION="$TAG" scripts/build-app.sh
+          ZIP="Boltun-$TAG-macos-arm64.zip"
+          ditto -c -k --keepParent build/Boltun.app "build/$ZIP"
+          (cd build && shasum -a 256 "$ZIP" > "$ZIP.sha256")
+          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+
+      - name: Publish GitHub release
+        run: |
+          previous=$(git tag --list 'v*.*.*' --sort=-v:refname | grep -vx "$TAG" | head -1 || true)
+          {
+            echo "Native macOS Mattermost client, Apple Silicon."
+            echo
+            echo "The app is ad-hoc signed, not notarized: on first launch right-click it and choose **Open**,"
+            echo "or run \`xattr -dr com.apple.quarantine /Applications/Boltun.app\`."
+            echo
+            if [ -n "$previous" ]; then
+              echo "### Changes since $previous"
+              git log --no-merges --format='- %s (%h)' "$previous..$TAG"
+            else
+              echo "### Changes"
+              git log --no-merges --format='- %s (%h)' "$TAG"
+            fi
+          } > notes.md
+          flags=()
+          if [[ "$TAG" == *-* ]]; then flags+=(--prerelease); else flags+=(--latest); fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "build/$ZIP" "build/$ZIP.sha256" --clobber
+            gh release edit "$TAG" --notes-file notes.md "${flags[@]}"
+          else
+            gh release create "$TAG" "build/$ZIP" "build/$ZIP.sha256" --verify-tag \
+              --title "Boltun $TAG" --notes-file notes.md "${flags[@]}"
+          fi

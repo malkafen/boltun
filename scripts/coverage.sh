@@ -1,0 +1,39 @@
+#!/bin/bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+scripts/test.sh --enable-code-coverage
+
+BIN=$(swift build --show-bin-path)
+PROFILE="$BIN/codecov/default.profdata"
+OBJECTS=()
+for bundle in "$BIN"/*.xctest; do
+  if [ ${#OBJECTS[@]} -eq 0 ]; then
+    OBJECTS+=("$bundle/Contents/MacOS/$(basename "$bundle" .xctest)")
+  else
+    OBJECTS+=(-object "$bundle/Contents/MacOS/$(basename "$bundle" .xctest)")
+  fi
+done
+IGNORE='(\.build|Tests)/|Sources/Boltun/'
+
+xcrun llvm-cov report "${OBJECTS[@]}" -instr-profile "$PROFILE" -ignore-filename-regex "$IGNORE"
+
+if [ "${1:-}" = "--lcov" ]; then
+  xcrun llvm-cov export "${OBJECTS[@]}" -instr-profile "$PROFILE" -ignore-filename-regex "$IGNORE" -format=lcov > "$2"
+fi
+
+TOTAL=$(xcrun llvm-cov export "${OBJECTS[@]}" -instr-profile "$PROFILE" -ignore-filename-regex "$IGNORE" -summary-only \
+  | python3 -c 'import json,sys; print("%.2f" % json.load(sys.stdin)["data"][0]["totals"]["lines"]["percent"])')
+echo "Total line coverage: $TOTAL%"
+if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+  {
+    echo "### Code coverage: $TOTAL%"
+    echo '```'
+    xcrun llvm-cov report "${OBJECTS[@]}" -instr-profile "$PROFILE" -ignore-filename-regex "$IGNORE"
+    echo '```'
+  } >> "$GITHUB_STEP_SUMMARY"
+fi
+if [ -n "${MIN_COVERAGE:-}" ]; then
+  python3 -c "import sys; sys.exit(0 if $TOTAL >= $MIN_COVERAGE else 1)" \
+    || { echo "Coverage $TOTAL% is below the required $MIN_COVERAGE%"; exit 1; }
+fi
