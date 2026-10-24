@@ -30,6 +30,10 @@ public struct GeneralSettingsView: View {
                     Text("Collapsed reply threads")
                     Text("Show replies in the thread pane instead of the channel.")
                 }
+                Toggle(isOn: $model.settings.showReadStatus) {
+                    Text("Show read status")
+                    Text("Mark your direct and group messages once the other members have seen them.")
+                }
                 Toggle("Check spelling while typing", isOn: $model.settings.spellChecking)
                 LabeledContent("Text size") {
                     HStack {

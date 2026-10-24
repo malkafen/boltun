@@ -121,6 +121,9 @@ struct MessageRow: View, Equatable {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            if model.isContinuation, let readStatus = model.readStatus {
+                ReadStatusIndicator(model: readStatus).padding(.top, 4)
+            }
         }
         .padding(.leading, 16)
         .padding(.trailing, 20)
@@ -183,6 +186,7 @@ struct MessageRow: View, Equatable {
                 .scaledFont(11.5)
                 .foregroundStyle(Theme.textSecondary)
                 .help(model.fullTimeText)
+            if let readStatus = model.readStatus { ReadStatusIndicator(model: readStatus) }
             PostPriorityBadge(level: model.priority)
             if let burn = model.burnOnRead {
                 if burn.showsTimer {

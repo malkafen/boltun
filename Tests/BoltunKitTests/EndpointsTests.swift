@@ -106,6 +106,20 @@ import Testing
         #expect(body["type"] as? String == "custom")
     }
 
+    @Test func batchCategoryUpdateAndOrder() async throws {
+        let work = ChannelCategory(id: "cat", userId: "me", teamId: "t1", type: .custom, displayName: "Work", sorting: .manual, channelIds: ["c2"])
+        let channels = ChannelCategory(id: "chan", userId: "me", teamId: "t1", type: .channels, displayName: "Channels", channelIds: ["c1"])
+        transport.on("PUT", "users/me/teams/t1/channels/categories") { request in .json(request.bodyText) }
+        transport.on("PUT", "users/me/teams/t1/channels/categories/order") { request in .json(request.bodyText) }
+        #expect(try await client.updateCategories(teamId: "t1", [work, channels]) == [work, channels])
+        let body = try only("PUT", "users/me/teams/t1/channels/categories").jsonBody as? [[String: Any]]
+        #expect(body?.map { $0["id"] as? String } == ["cat", "chan"])
+        #expect(body?.first?["sorting"] as? String == "manual")
+        #expect(body?.last?["sorting"] as? String == "")
+        #expect(try await client.updateCategoryOrder(teamId: "t1", order: ["chan", "cat"]) == ["chan", "cat"])
+        #expect(try only("PUT", "users/me/teams/t1/channels/categories/order").jsonBody as? [String] == ["chan", "cat"])
+    }
+
     @Test func singleChannelEndpoints() async throws {
         transport.on("GET", "channels/c1", object: Fixtures.channel("c1", team: "t1", name: "dev"))
         transport.on("GET", "channels/c1/members/me", object: Fixtures.member("c1", user: "me", msgCount: 4))

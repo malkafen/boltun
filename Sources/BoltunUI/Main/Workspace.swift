@@ -370,7 +370,13 @@ final class Workspace {
 
     var mentionKeys: [String] { markupContext().mentionKeys }
 
-    func timelineContext(lastViewedAt: Int64, showReplyContext: Bool, collapsedThreads: Bool = false, followThreads: Bool = false) -> TimelineContext {
+    func timelineContext(
+        lastViewedAt: Int64,
+        showReplyContext: Bool,
+        collapsedThreads: Bool = false,
+        followThreads: Bool = false,
+        readStates: [String: PostReadState] = [:]
+    ) -> TimelineContext {
         let session = session
         let markup = markupContext()
         let cache = renderCache
@@ -392,6 +398,7 @@ final class Workspace {
             acknowledgementsEnabled: session.acknowledgementsEnabled,
             burnOnReadEnabled: session.burnOnReadEnabled,
             openThreadId: threadRootId,
+            readStates: readStates,
             canToggleAcknowledgement: { session.canToggleAcknowledgement(postId: $0) },
             burnOnReadReceipt: { session.burnOnReadReceipt(postId: $0) },
             isRevealing: { session.isRevealing(postId: $0) },
@@ -419,7 +426,8 @@ final class Workspace {
                 lastViewedAt: timeline.lastViewedAtOnOpen,
                 showReplyContext: !session.collapsedThreads,
                 collapsedThreads: session.collapsedThreads,
-                followThreads: session.collapsedThreads
+                followThreads: session.collapsedThreads,
+                readStates: session.readStates(channelId: channelId)
             )
         )
     }

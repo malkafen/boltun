@@ -26,6 +26,17 @@ struct AutomationUIState: Codable, Equatable, Sendable {
         var requestedAck: Bool = false
         var acknowledgedBy: [String] = []
         var burnOnRead: BurnOnReadSummary?
+        var readStatus: String?
+        var seenBy: [String] = []
+        var readIndicator = false
+    }
+
+    struct ReadStatusTracking: Codable, Equatable, Sendable {
+        var enabled: Bool
+        var tracked: Bool
+        var polling: Bool
+        var total: Int
+        var unseenByMember: [String: Int]
     }
 
     struct Composer: Codable, Equatable, Sendable {
@@ -80,6 +91,8 @@ struct AutomationUIState: Codable, Equatable, Sendable {
     var myStatus: String?
     var threadFollowing: Bool?
     var readInfo: ReadInfoFeatures?
+    var readStatus: ReadStatusTracking?
+    var sidebar: [SidebarCategorySummary] = []
 
     struct Editor: Codable, Equatable, Sendable {
         var spellChecking: Bool
@@ -274,6 +287,8 @@ extension DebugAutomation {
             case .endOfOthers: session.moveTeam(team.id, onto: .endOfOthers)
             }
             return session.orderedTeams.map(\.name).joined(separator: ",")
+        case .channelMove, .categoryMove, .categorySort:
+            return try await performSidebarOrder(command, session: session)
         default:
             throw AutomationError.invalidCommand
         }
@@ -367,6 +382,9 @@ extension DebugAutomation {
         if workspace.pendingDeletion != nil { sheets.append("delete-confirmation") }
         if workspace.notificationPreferences != nil { sheets.append("notification-preferences") }
         if workspace.pendingBurn != nil { sheets.append("burn-confirmation") }
+        let timelinePosts = session.timelinePosts(channelId: channelId)
+        let readStates = session.readStates(channelId: channelId)
+        let readIndicators = ReadStatusPlacement.postIds(posts: timelinePosts, states: readStates, myId: session.myId)
         let threadComposer = workspace.threadRootId.flatMap { rootId in
             session.posts[rootId].map { workspace.composer(for: ComposerTarget(channelId: $0.channelId, rootId: rootId)) }
         }
@@ -389,7 +407,7 @@ extension DebugAutomation {
             timelineUniqueCount: Set(timeline.postIds).count,
             hasMoreOlder: timeline.hasMoreOlder,
             timelineLoading: timeline.isLoading,
-            recentPosts: session.timelinePosts(channelId: channelId).suffix(12).map { Self.summary($0, session: session) },
+            recentPosts: timelinePosts.suffix(12).map { Self.summary($0, session: session, readStates: readStates, readIndicators: readIndicators) },
             composer: channelId.isEmpty ? nil : Self.summary(workspace.composer(for: ComposerTarget(channelId: channelId))),
             threadComposer: threadComposer.map(Self.summary),
             typing: session.typingUsers(channelId: channelId),
@@ -412,8 +430,42 @@ extension DebugAutomation {
                 persistentNotifications: session.persistentNotificationsEnabled,
                 burnOnRead: session.burnOnReadEnabled,
                 licenseSku: session.license.skuShortName
-            )
+            ),
+            readStatus: Self.readStatusTracking(session: session, channelId: channelId),
+            sidebar: Self.sidebarSummary(session)
         )
+    }
+
+    static func readStatusTracking(session: ServerSession, channelId: String) -> AutomationUIState.ReadStatusTracking {
+        let total = session.channels[channelId].map { ReadStatus.total(of: $0, collapsedThreads: session.collapsedThreads) } ?? 0
+        let members = session.tracksReadStatus(channelId: channelId) ? session.readCounts[channelId] ?? [] : []
+        let unseen = members.map { member in
+            (session.displayName(userId: member.userId), max(0, total - member.viewedCount(collapsedThreads: session.collapsedThreads)))
+        }
+        return AutomationUIState.ReadStatusTracking(
+            enabled: session.readStatusEnabled,
+            tracked: session.tracksReadStatus(channelId: channelId),
+            polling: session.isPollingReadStatus,
+            total: total,
+            unseenByMember: Dictionary(unseen, uniquingKeysWith: { a, _ in a })
+        )
+    }
+
+    static func describe(_ state: PostReadState?) -> String? {
+        switch state {
+        case .sent: return "sent"
+        case .seen: return "seen"
+        case .partiallySeen(_, let total): return "partially-seen/\(total)"
+        case nil: return nil
+        }
+    }
+
+    static func seenBy(_ state: PostReadState?, session: ServerSession) -> [String] {
+        switch state {
+        case .partiallySeen(let ids, _): return ids.map { session.displayName(userId: $0) }
+        case .seen: return session.readCounts[session.currentChannelId ?? ""]?.map { session.displayName(userId: $0.userId) } ?? []
+        default: return []
+        }
     }
 
     static func editors(in view: NSView?) -> [AutomationUIState.Editor] {
@@ -424,7 +476,12 @@ extension DebugAutomation {
         return view.subviews.flatMap { editors(in: $0) }
     }
 
-    static func summary(_ post: Post, session: ServerSession) -> AutomationUIState.PostSummary {
+    static func summary(
+        _ post: Post,
+        session: ServerSession,
+        readStates: [String: PostReadState] = [:],
+        readIndicators: Set<String> = []
+    ) -> AutomationUIState.PostSummary {
         AutomationUIState.PostSummary(
             id: post.id,
             user: session.displayName(for: post),
@@ -439,7 +496,10 @@ extension DebugAutomation {
             priority: post.priorityLevel.isLabelled ? post.priorityLevel.rawValue : nil,
             requestedAck: post.requestsAcknowledgement,
             acknowledgedBy: post.acknowledgements.map { session.displayName(userId: $0.userId) },
-            burnOnRead: burnOnReadSummary(post, session: session)
+            burnOnRead: burnOnReadSummary(post, session: session),
+            readStatus: describe(readStates[post.id]),
+            seenBy: seenBy(readStates[post.id], session: session),
+            readIndicator: readIndicators.contains(post.id)
         )
     }
 

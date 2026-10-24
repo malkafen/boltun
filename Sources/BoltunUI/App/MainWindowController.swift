@@ -6,6 +6,7 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
     public static let autosaveName = "BoltunMainWindow"
     public static let minimumSize = NSSize(width: 900, height: 600)
     public static let defaultSize = NSSize(width: 1240, height: 820)
+    var onBecomeKey: () -> Void = {}
 
     public init<Content: View>(rootView: Content, autosaveName: String? = MainWindowController.autosaveName) {
         let window = NSWindow(
@@ -49,6 +50,10 @@ public final class MainWindowController: NSWindowController, NSWindowDelegate {
         if window.isMiniaturized { window.deminiaturize(nil) }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate()
+    }
+
+    public func windowDidBecomeKey(_ notification: Notification) {
+        onBecomeKey()
     }
 
     public func windowShouldClose(_ sender: NSWindow) -> Bool {

@@ -56,13 +56,14 @@ struct MessageRowModel: Equatable, Identifiable {
     var priority: PostPriorityLevel = .standard
     var acknowledgement: AcknowledgementRowModel?
     var burnOnRead: BurnOnReadRowModel?
+    var readStatus: ReadStatusRowModel?
 
     static func == (lhs: MessageRowModel, rhs: MessageRowModel) -> Bool {
         lhs.post == rhs.post && lhs.authorName == rhs.authorName && lhs.avatarURL == rhs.avatarURL && lhs.authorStatus == rhs.authorStatus
             && lhs.isContinuation == rhs.isContinuation && lhs.isMine == rhs.isMine && lhs.mentionsMe == rhs.mentionsMe
             && lhs.replyContext == rhs.replyContext && lhs.replyCount == rhs.replyCount && lhs.thread == rhs.thread && lhs.reactions == rhs.reactions
             && lhs.following == rhs.following && lhs.timeText == rhs.timeText && lhs.priority == rhs.priority
-            && lhs.acknowledgement == rhs.acknowledgement && lhs.burnOnRead == rhs.burnOnRead
+            && lhs.acknowledgement == rhs.acknowledgement && lhs.burnOnRead == rhs.burnOnRead && lhs.readStatus == rhs.readStatus
     }
 }
 
@@ -96,6 +97,7 @@ struct TimelineContext {
     var acknowledgementsEnabled = false
     var burnOnReadEnabled = false
     var openThreadId: String?
+    var readStates: [String: PostReadState] = [:]
     var canToggleAcknowledgement: (String) -> Bool = { _ in false }
     var burnOnReadReceipt: (String) -> BurnOnReadReceipt? = { _ in nil }
     var isRevealing: (String) -> Bool = { _ in false }
@@ -120,6 +122,7 @@ enum TimelineBuilder {
         var previous: Post?
         var lastDayTitle: String?
         var insertedNewLine = false
+        let readStatusIds = ReadStatusPlacement.postIds(posts: posts, states: context.readStates, myId: context.myId)
         for post in posts {
             var breaksGroup = false
             let date = post.createAt.mattermostDate
@@ -137,7 +140,8 @@ enum TimelineBuilder {
                 breaksGroup = true
             }
             let continuation = !breaksGroup && previous.map { canGroup(post, after: $0) } == true
-            result.append(.post(row(for: post, previous: previous, continuation: continuation, context: context)))
+            let readStatus = readStatusIds.contains(post.id) ? context.readStates[post.id] : nil
+            result.append(.post(row(for: post, previous: previous, continuation: continuation, context: context, readState: readStatus)))
             previous = post
         }
         return result
@@ -166,7 +170,7 @@ enum TimelineBuilder {
         post.priorityLevel.isLabelled || post.requestsAcknowledgement || post.isBurnOnRead
     }
 
-    static func row(for post: Post, previous: Post?, continuation: Bool, context: TimelineContext) -> MessageRowModel {
+    static func row(for post: Post, previous: Post?, continuation: Bool, context: TimelineContext, readState: PostReadState? = nil) -> MessageRowModel {
         let date = post.createAt.mattermostDate
         let isMine = post.userId == context.myId
         let burn = burnOnRead(for: post, context: context)
@@ -189,7 +193,8 @@ enum TimelineBuilder {
             blocks: post.isDeleted || burn?.showsPlaceholder == true ? [] : context.render(post),
             priority: context.postPriorityEnabled ? post.priorityLevel : .standard,
             acknowledgement: acknowledgement(for: post, context: context),
-            burnOnRead: burn
+            burnOnRead: burn,
+            readStatus: readState.map { ReadStatusRowModel(state: $0, userName: context.userName) }
         )
     }
 

@@ -10,6 +10,7 @@ public final class AppModel {
         didSet {
             persist()
             if settings.collapsedThreads != oldValue.collapsedThreads { applyCollapsedThreads() }
+            if settings.showReadStatus != oldValue.showReadStatus { applyReadStatus() }
         }
     }
     public private(set) var selectedServerId: UUID?
@@ -100,6 +101,7 @@ public final class AppModel {
             self?.rememberSelection(serverId: server.id, teamId: teamId, channelId: channelId)
         }
         session.collapsedThreads = settings.collapsedThreads
+        session.readStatusEnabled = settings.showReadStatus
         session.teamLayout = server.teamLayout
         session.onTeamLayoutChange = { [weak self] layout in
             self?.rememberTeamLayout(serverId: server.id, layout: layout)
@@ -138,17 +140,35 @@ public final class AppModel {
         }
     }
 
+    func applyReadStatus() {
+        let enabled = settings.showReadStatus
+        for session in sessions.values {
+            Task { await session.setReadStatusEnabled(enabled) }
+        }
+    }
+
     public func select(serverId: UUID) async {
         guard servers.contains(where: { $0.id == serverId }) else { return }
         selectedServerId = serverId
         settings.lastServerId = serverId
+        for (id, session) in sessions where id != serverId { session.stopReadStatusPolling() }
         await restoreSelection(serverId: serverId)
         await refreshSelectedPresence()
+        await refreshSelectedReadStatus()
     }
 
     public func refreshSelectedPresence() async {
         guard let session = selectedSession, session.connection == .connected else { return }
         await session.refreshPresence()
+    }
+
+    public func refreshSelectedReadStatus() async {
+        guard let session = selectedSession, session.connection == .connected else { return }
+        await session.refreshVisibleReadStatus(restartPolling: true)
+    }
+
+    public func appDidResignActive() {
+        for session in sessions.values { session.stopReadStatusPolling() }
     }
 
     public func selectServer(at index: Int) async {

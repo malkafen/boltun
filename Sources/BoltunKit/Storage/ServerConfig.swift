@@ -45,6 +45,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var spellChecking = true
     public var fontScale: Double = 1.0
     public var collapsedThreads = true
+    public var showReadStatus = true
     public var lastServerId: UUID?
 
     public init() {}
@@ -62,6 +63,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
         spellChecking = c.value(.spellChecking, default: defaults.spellChecking)
         fontScale = c.value(.fontScale, default: defaults.fontScale)
         collapsedThreads = c.value(.collapsedThreads, default: defaults.collapsedThreads)
+        showReadStatus = c.value(.showReadStatus, default: defaults.showReadStatus)
         lastServerId = c.optional(.lastServerId)
     }
 }

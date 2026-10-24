@@ -17,6 +17,7 @@ no bundled browser, no web view, just the Mattermost REST API and WebSocket.
 - Message priority: send standard, important or urgent messages with an optional acknowledgement request and persistent notifications; priority labels appear next to the author
 - Acknowledgements: acknowledge a message that asked for it, see the count and who acknowledged it and when, updated live
 - Burn-on-read messages: recipients reveal a concealed message and watch its countdown, the sender sees how many recipients read it, and expired messages disappear by themselves
+- Read status in direct and group messages: one checkmark once your message is sent, two blue checkmarks once it has been seen, and two grey checkmarks while only some group members have seen it (hover for who); turn it off in Settings
 - Search, quick channel switcher
 - Native notifications and a dock badge
 - Notification control: mute a channel or conversation from the sidebar or channel menu, and per-channel notification preferences (desktop level, thread replies, ignoring `@channel`/`@here`/`@all`); muted teams can be silenced locally from the team sidebar

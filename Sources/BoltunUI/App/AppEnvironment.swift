@@ -92,7 +92,9 @@ public final class AppEnvironment: AutomationHost {
 
     public func showMainWindow() {
         if windowController == nil {
-            windowController = MainWindowController(rootView: AppRootView(model: model, router: router))
+            let controller = MainWindowController(rootView: AppRootView(model: model, router: router))
+            controller.onBecomeKey = { [weak self] in self?.mainWindowDidBecomeKey() }
+            windowController = controller
         }
         windowController?.present()
     }
@@ -100,7 +102,20 @@ public final class AppEnvironment: AutomationHost {
     public func appDidBecomeActive() {
         guard launched else { return }
         let model = self.model
-        Task { await model.refreshSelectedPresence() }
+        Task {
+            await model.refreshSelectedPresence()
+            await model.refreshSelectedReadStatus()
+        }
+    }
+
+    public func appDidResignActive() {
+        model.appDidResignActive()
+    }
+
+    func mainWindowDidBecomeKey() {
+        guard launched else { return }
+        let model = self.model
+        Task { await model.refreshSelectedReadStatus() }
     }
 
     public func handle(url: URL) async {

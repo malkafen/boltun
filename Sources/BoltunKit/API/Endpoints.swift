@@ -73,12 +73,24 @@ public extension APIClient {
         try await send(ChannelCategory.self, .put, "users/me/teams/\(category.teamId)/channels/categories/\(category.id)", json: category)
     }
 
+    func updateCategories(teamId: String, _ categories: [ChannelCategory]) async throws -> [ChannelCategory] {
+        try await send([ChannelCategory].self, .put, "users/me/teams/\(teamId)/channels/categories", json: categories)
+    }
+
+    func updateCategoryOrder(teamId: String, order: [String]) async throws -> [String] {
+        try await send([String].self, .put, "users/me/teams/\(teamId)/channels/categories/order", json: order)
+    }
+
     func channel(id: String) async throws -> Channel {
         try await send(Channel.self, .get, "channels/\(id)")
     }
 
     func channelMember(channelId: String) async throws -> ChannelMember {
         try await send(ChannelMember.self, .get, "channels/\(channelId)/members/me")
+    }
+
+    func channelMemberReadCounts(channelId: String, perPage: Int = 200) async throws -> [MemberReadCount] {
+        try await send([MemberReadCount].self, .get, "channels/\(channelId)/members", query: ["page": "0", "per_page": String(perPage)])
     }
 
     func channelStats(channelId: String) async throws -> ChannelStats {
