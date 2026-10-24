@@ -94,6 +94,9 @@ public final class ServerSession {
     @ObservationIgnored var lastPendingMillis: Int64 = 0
     @ObservationIgnored var deletedPostIds = Set<String>()
     @ObservationIgnored var manuallyUnread = Set<String>()
+    @ObservationIgnored var categoryWrites: [String: Int] = [:]
+    @ObservationIgnored var staleCategoryTeams = Set<String>()
+    @ObservationIgnored var categoryRevisions: [String: Int] = [:]
     @ObservationIgnored let pageSize: Int
 
     public init(
@@ -795,7 +798,7 @@ public final class ServerSession {
             let member = try await client.joinChannel(channelId: channel.id, userId: myId)
             channels[channel.id] = channel
             members[channel.id] = member
-            if let teamId = currentTeamId { _ = await quietly { try await refreshCategories(teamId: teamId) } }
+            if let teamId = currentTeamId { await reloadCategories(teamId: teamId) }
             await selectChannel(channel.id)
         } catch {
             report(error)
@@ -856,7 +859,7 @@ public final class ServerSession {
         for category in changed where await quietly({ try await client.updateCategory(category) }) == nil {
             failed = true
         }
-        if failed { _ = await quietly { try await refreshCategories(teamId: teamId) } }
+        if failed { await reloadCategories(teamId: teamId) }
     }
 
     public func setCategoryCollapsed(_ categoryId: String, collapsed: Bool) async {
@@ -924,10 +927,6 @@ public final class ServerSession {
     public func refreshStatuses(_ ids: [String]) async {
         guard !ids.isEmpty, let found = await quietly({ try await client.statuses(userIds: ids) }) else { return }
         for status in found where statuses[status.userId] != status.status { statuses[status.userId] = status.status }
-    }
-
-    func refreshCategories(teamId: String) async throws {
-        categories[teamId] = try await client.myCategories(teamId: teamId).sorted
     }
 
     func refreshTeamUnreads() async {

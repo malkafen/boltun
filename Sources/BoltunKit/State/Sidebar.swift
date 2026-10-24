@@ -6,14 +6,18 @@ public struct SidebarSection: Hashable, Identifiable, Sendable {
     public var type: CategoryType
     public var collapsed: Bool
     public var channelIds: [String]
+    public var sorting: CategorySorting
 
-    public init(id: String, title: String, type: CategoryType, collapsed: Bool, channelIds: [String]) {
+    public init(id: String, title: String, type: CategoryType, collapsed: Bool, channelIds: [String], sorting: CategorySorting = .default) {
         self.id = id
         self.title = title
         self.type = type
         self.collapsed = collapsed
         self.channelIds = channelIds
+        self.sorting = sorting
     }
+
+    public var effectiveSorting: CategorySorting { sorting.resolved(for: type) }
 }
 
 public struct ChannelUnread: Hashable, Sendable {
@@ -79,7 +83,7 @@ public enum SidebarBuilder {
                 ids = Array(ids.prefix(limit)) + overflow
             }
             claimed.formUnion(ids)
-            result.append(SidebarSection(id: category.id, title: category.displayName, type: category.type, collapsed: category.collapsed, channelIds: ids))
+            result.append(SidebarSection(id: category.id, title: category.displayName, type: category.type, collapsed: category.collapsed, channelIds: ids, sorting: category.sorting))
         }
         return result
     }
@@ -101,19 +105,10 @@ public enum SidebarBuilder {
     }
 
     static func sort(_ ids: [String], category: ChannelCategory, channels: [String: Channel], displayName: (Channel) -> String) -> [String] {
-        switch category.sorting {
-        case .alphabetical:
-            return sortAlphabetical(ids, channels: channels, displayName: displayName)
-        case .recent:
-            return sortRecent(ids, channels: channels)
-        case .manual:
-            return ids
-        case .default:
-            switch category.type {
-            case .directMessages: return sortRecent(ids, channels: channels)
-            case .custom: return ids
-            case .channels, .favorites: return sortAlphabetical(ids, channels: channels, displayName: displayName)
-            }
+        switch category.sorting.resolved(for: category.type) {
+        case .alphabetical: return sortAlphabetical(ids, channels: channels, displayName: displayName)
+        case .recent: return sortRecent(ids, channels: channels)
+        case .manual, .default: return ids
         }
     }
 

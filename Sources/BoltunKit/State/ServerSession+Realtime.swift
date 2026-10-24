@@ -137,10 +137,7 @@ extension ServerSession {
             }
         case WebSocketEventType.sidebarCategoryCreated, WebSocketEventType.sidebarCategoryUpdated,
              WebSocketEventType.sidebarCategoryDeleted, WebSocketEventType.sidebarCategoryOrderUpdated:
-            let teamId = event.broadcast.teamId.isEmpty ? (event.string("team_id") ?? "") : event.broadcast.teamId
-            if loadedTeams.contains(teamId) {
-                Task { _ = await self.quietly { try await self.refreshCategories(teamId: teamId) } }
-            }
+            handleCategoryEvent(event)
         case WebSocketEventType.emojiAdded:
             if let emoji = event.embedded(CustomEmoji.self, "emoji") { customEmojis[emoji.name] = emoji }
         case WebSocketEventType.threadFollowChanged:
@@ -311,7 +308,7 @@ extension ServerSession {
             if let partner = channel.directPartnerId(me: myId) { await ensureUsers([partner]) }
             let teamIds = channel.teamId.isEmpty ? Array(loadedTeams) : [channel.teamId]
             for teamId in teamIds where loadedTeams.contains(teamId) {
-                _ = await quietly { try await refreshCategories(teamId: teamId) }
+                await reloadCategories(teamId: teamId)
             }
         } catch {
             report(error, silently: true)
