@@ -1,6 +1,18 @@
 import Foundation
 @testable import BoltunKit
 
+final class Counter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+
+    func next() -> Int {
+        lock.withLock {
+            value += 1
+            return value
+        }
+    }
+}
+
 final class MockServer: @unchecked Sendable {
     let transport = FakeTransport()
     let connector = FakeConnector()
@@ -65,7 +77,7 @@ final class MockServer: @unchecked Sendable {
             Fixtures.category("chan2", user: "me1", team: "t2", type: "channels", display: "Channels", channels: ["c-beta"]),
             Fixtures.category("dm2", user: "me1", team: "t2", type: "direct_messages", display: "Direct Messages", channels: ["c-dm", "c-gm"]),
         ]))
-        transport.on("POST", "users/ids") { [unowned self] request in
+        transport.on("POST", "users/ids") { [self] request in
             let ids = request.jsonBody as? [String] ?? []
             return .object(self.lock.withLock { ids.compactMap { self.directory[$0] } })
         }
@@ -76,7 +88,7 @@ final class MockServer: @unchecked Sendable {
         transport.on("POST", "channels/members/me/view", object: ["status": "OK", "last_viewed_at_times": [:]])
         transport.on("GET", "emoji", object: [["id": "e1", "name": "partyparrot", "creator_id": "u2"]])
         for channelId in ["c-town", "c-dev", "c-dm", "c-gm", "c-beta"] {
-            transport.on("GET", "channels/\(channelId)/posts") { [unowned self] request in
+            transport.on("GET", "channels/\(channelId)/posts") { [self] request in
                 .object(self.page(channelId: channelId, query: request.query))
             }
         }
@@ -125,6 +137,44 @@ final class MockServer: @unchecked Sendable {
             return Fixtures.postList(Array(live.filter { ($0["create_at"] as! Int64) < pivot }.prefix(perPage)))
         }
         return Fixtures.postList(Array(live.prefix(perPage)))
+    }
+
+    func acceptPosts(gate: Gate? = nil) {
+        let counter = Counter()
+        transport.on("POST", "posts") { [self] request in
+            if let gate { await gate.wait() }
+            let body = request.jsonObject
+            let number = counter.next()
+            var post = Fixtures.post(
+                "srv\(number)",
+                channel: body["channel_id"] as? String ?? "",
+                user: Self.me,
+                message: body["message"] as? String ?? "",
+                createAt: Int64(1000 + number),
+                rootId: body["root_id"] as? String ?? "",
+                pendingPostId: body["pending_post_id"] as? String ?? ""
+            )
+            post["file_ids"] = body["file_ids"] ?? []
+            self.addPost(post)
+            return .object(post, status: 201)
+        }
+    }
+
+    func hold(_ method: String, _ path: String, gate: Gate, then response: @escaping @Sendable (URLRequest) -> FakeResponse) {
+        transport.on(method, path) { request in
+            await gate.wait()
+            return response(request)
+        }
+    }
+
+    func holdPosts(_ channelId: String, gate: Gate) {
+        hold("GET", "channels/\(channelId)/posts", gate: gate) { [self] request in
+            .object(self.page(channelId: channelId, query: request.query))
+        }
+    }
+
+    var viewedChannels: [String] {
+        transport.requests("POST", "channels/members/me/view").compactMap { $0.jsonObject["channel_id"] as? String }
     }
 
     func realtimeFactory(sleeper: RealtimeClient.Sleeper? = nil) -> (URL, String) -> RealtimeClient {
