@@ -93,6 +93,8 @@ struct AutomationUIState: Codable, Equatable, Sendable {
     var readInfo: ReadInfoFeatures?
     var readStatus: ReadStatusTracking?
     var sidebar: [SidebarCategorySummary] = []
+    var profile: ProfileSummary?
+    var members: MembersSummary?
 
     struct Editor: Codable, Equatable, Sendable {
         var spellChecking: Bool
@@ -289,6 +291,8 @@ extension DebugAutomation {
             return session.orderedTeams.map(\.name).joined(separator: ",")
         case .channelMove, .categoryMove, .categorySort:
             return try await performSidebarOrder(command, session: session)
+        case .members, .membersSearch, .membersMore, .memberMessage, .profile, .profileMessage:
+            return try await performProfile(command, workspace: workspace)
         default:
             throw AutomationError.invalidCommand
         }
@@ -395,6 +399,7 @@ extension DebugAutomation {
                 switch pane {
                 case .thread(let id): return "thread:\(id)"
                 case .search: return "search"
+                case .members: return "members"
                 }
             },
             threadPosts: workspace.threadRootId.map { session.threadPosts(rootId: $0).map { Self.summary($0, session: session) } } ?? [],
@@ -432,7 +437,9 @@ extension DebugAutomation {
                 licenseSku: session.license.skuShortName
             ),
             readStatus: Self.readStatusTracking(session: session, channelId: channelId),
-            sidebar: Self.sidebarSummary(session)
+            sidebar: Self.sidebarSummary(session),
+            profile: Self.profileSummary(workspace),
+            members: Self.membersSummary(workspace)
         )
     }
 

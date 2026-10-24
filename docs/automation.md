@@ -42,7 +42,7 @@ From the Linux dev host, run the same commands through `ssh macbox@192.168.5.90`
 
 | Command | Effect |
 | --- | --- |
-| `snapshot?path=/tmp/x.png[&window=main\|sheet\|settings\|key]` | Renders a window to PNG. `sheet` is the sheet attached to the main window. |
+| `snapshot?path=/tmp/x.png[&window=main\|sheet\|settings\|key\|popover]` | Renders a window to PNG. `sheet` is the sheet attached to the main window. `popover` renders the main window with every open popover drawn over it at its screen position, so the profile popover can be captured without screen recording access. |
 | `state?path=/tmp/x.json` | Dumps servers, connection states, selected team and channel, unread and mention counts, visible post count, badge, open sheet and window visibility. |
 | `add-server?url=<url>[&name=<name>]` | Validates the server and adds it. The site name is used when `name` is omitted. |
 | `login?server=<index>&user=<login>&password=<password>` | Logs in to the server at the given index (default 0). |
@@ -107,6 +107,18 @@ from the newest regular post, so `index=0` is the last one.
 `zoom-out`, `zoom-reset`, `next-server`, `previous-server`, `server` (with `number`, 1-based), `next-channel`,
 `previous-channel`, `next-unread`, `browse`, `direct-messages`, `close-sheets` and `preview-last-image`.
 
+### Profiles and channel members
+
+| Command | Effect |
+| --- | --- |
+| `members[?on=0\|1]` | Toggles the Members right pane of the current channel, as clicking the member count in the channel header does. `on=1` only opens it and `on=0` only closes it. Direct messages have no members pane. After opening, the command waits for the first page. The detail is the number of listed members. |
+| `members-search?q=<term>` | Types into the "Search members" field of the open pane and waits for the debounced server search. An empty `q` clears the search. The detail is the number of listed members. |
+| `members-more` | Loads the next page of members, as scrolling to the end of the list does. The detail is the number of loaded profiles. |
+| `member-message?user=<username>` | Clicks "Send message" on a member row: opens the direct message and closes the pane. The detail is the resulting channel id. |
+| `profile[?in=channel\|thread\|search\|members][&target=avatar\|name\|mention\|member][&index=<n>][&post=<id>][&user=<username>]` | Opens the profile popover the way a click does. `in=channel` (the default) and `in=thread` use post indexes counted back from the newest regular post (of the open thread for `thread`); `in=search` uses the 0-based search result index. `target=mention` needs `user`, the mentioned name as written after `@`, and anchors the popover to the message text. `in=members` (target `member`) needs `user` and the open members pane. The command waits until the profile, status and memberships are loaded. The detail is the user id. |
+| `profile?close=1` | Closes the profile popover. |
+| `profile-message` | Clicks "Message" (or "Send yourself a message") in the open popover. The detail is the resulting channel id. |
+
 ### UI state
 
 `state` lists teams in sidebar order with `favoriteTeams` and `mutedTeams`, and also writes a `ui` object for the selected workspace. It includes the window title, first responder, open right
@@ -118,6 +130,15 @@ live composer text view, `collapsedThreads`, `myStatus` and `threadFollowing` fo
 `replyCount`, the author's `status` and, for root posts, `following`. `sidebar` lists the channel sidebar categories in
 order with their `id`, `title`, `type`, effective `sorting` (`alpha`, `recent` or `manual`), `collapsed` flag and the
 display names of their `channels` in sidebar order.
+
+`rightPane` is `members` while the Members pane is open. `profile` describes the open profile popover: `anchor`
+(`<surface>:<target>:<post or user id>`), `userId`, `loaded` (false until the user's profile is known) and, once loaded,
+`username`, `fullName`, `role` (`BOT`, `GUEST`, `System Admin`, `Team Admin` or `Channel Admin`), `botDescription`,
+`position`, `email`, `localTime` (title, time and offset), `customStatus` (emoji, text and expiry), `lastOnline`,
+`status`, `disclaimer` (webhook posts), `isSelf` and `button` (`Message`, `Send yourself a message` or absent).
+`members` describes the open pane: `channel`, `count` (the header member count), `loaded` (profiles fetched by
+paging), `searchVisible`, `search`, `searching`, `canLoadMore` and up to 80 `items`, which are the section titles
+(`CHANNEL ADMINS`, `MEMBERS`) and rows as `Display Name @username [status]`.
 
 Message read information is reported too. `readInfo` names the server-side gating (`postPriority`,
 `acknowledgements`, `persistentNotifications`, `burnOnRead` and the `licenseSku` they come from). Post summaries carry

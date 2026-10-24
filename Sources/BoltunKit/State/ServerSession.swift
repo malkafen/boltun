@@ -68,6 +68,9 @@ public final class ServerSession {
     public internal(set) var revealingPostIds: Set<String> = []
     public internal(set) var readCounts: [String: [MemberReadCount]] = [:]
     public internal(set) var readStatusEnabled = true
+    public internal(set) var channelRoster: [String: [String: ChannelMember]] = [:]
+    public internal(set) var teamRoster: [String: [String: TeamMember]] = [:]
+    public internal(set) var lastActivity: [String: Int64] = [:]
     public var teamLayout = TeamLayout() {
         didSet { if teamLayout != oldValue { onTeamLayoutChange?(teamLayout) } }
     }
@@ -93,6 +96,8 @@ public final class ServerSession {
     @ObservationIgnored var readStatusRestartPending = false
     @ObservationIgnored var requestedStatsChannelIds = Set<String>()
     @ObservationIgnored var requestedStatusIds = Set<String>()
+    @ObservationIgnored var refreshedProfileIds = Set<String>()
+    @ObservationIgnored var requestedMemberships = Set<String>()
     @ObservationIgnored let realtimeFactory: (URL, String) -> RealtimeClient
     @ObservationIgnored var realtime: RealtimeClient?
     @ObservationIgnored var realtimeTask: Task<Void, Never>?
@@ -940,7 +945,10 @@ public final class ServerSession {
 
     public func refreshStatuses(_ ids: [String]) async {
         guard !ids.isEmpty, let found = await quietly({ try await client.statuses(userIds: ids) }) else { return }
-        for status in found where statuses[status.userId] != status.status { statuses[status.userId] = status.status }
+        for status in found {
+            if statuses[status.userId] != status.status { statuses[status.userId] = status.status }
+            if lastActivity[status.userId] != status.lastActivityAt { lastActivity[status.userId] = status.lastActivityAt }
+        }
     }
 
     func refreshTeamUnreads() async {

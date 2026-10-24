@@ -144,7 +144,23 @@ struct AppDebugAutomationTests {
         #expect(sink.lines.last == "error /snapshot no sheet window")
         await automation.handle(URL(string: "boltun://debug/snapshot?path=\(path)&window=settings")!)
         #expect(sink.lines.last == "error /snapshot no settings window")
+        await automation.handle(URL(string: "boltun://debug/snapshot?path=\(path)&window=popover")!)
+        try? FileManager.default.removeItem(atPath: path)
+        #expect(sink.lines.last == "ok /snapshot \(path)")
         _ = try? automation.window(for: .key)
+    }
+
+    @Test func snapshotsComposePopoversOverTheWindow() throws {
+        _ = NSApplication.shared
+        let base = MainWindowController(rootView: Text("Base").frame(width: 300, height: 200), autosaveName: nil).window!
+        let corner = NSPoint(x: base.frame.maxX - 60, y: base.frame.maxY - 60)
+        let overlay = NSWindow(contentRect: NSRect(origin: corner, size: NSSize(width: 120, height: 120)), styleMask: .borderless, backing: .buffered, defer: false)
+        overlay.contentView = NSHostingView(rootView: Text("Pop").frame(width: 120, height: 120))
+        let plain = try #require(Snapshot.png(of: base).flatMap(NSBitmapImageRep.init(data:)))
+        let composed = try #require(Snapshot.png(of: base, overlays: [overlay], overlayFill: .red).flatMap(NSBitmapImageRep.init(data:)))
+        #expect(composed.size.width > plain.size.width)
+        #expect(composed.size.height > plain.size.height)
+        #expect(DebugAutomation.popoverWindows(excluding: base).isEmpty)
     }
 
     @Test func drivesUI() async {

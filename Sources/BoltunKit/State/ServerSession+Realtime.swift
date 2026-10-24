@@ -100,8 +100,9 @@ extension ServerSession {
                 channels[channelId] = channel
             }
         case WebSocketEventType.channelMemberUpdated:
-            if let member = event.embedded(ChannelMember.self, "channelMember"), member.userId == myId {
-                members[member.channelId] = member
+            if let member = event.embedded(ChannelMember.self, "channelMember") {
+                if member.userId == myId { members[member.channelId] = member }
+                applyRosterChange(member)
             }
         case WebSocketEventType.userAdded:
             if event.string("user_id") == myId {
@@ -111,6 +112,8 @@ extension ServerSession {
             let channelId = event.string("channel_id") ?? event.channelId
             if event.broadcast.userId == myId || event.string("user_id") == myId {
                 removeChannelMembership(channelId)
+            } else if let userId = event.string("user_id") {
+                removeFromRoster(channelId: channelId, userId: userId)
             }
         case WebSocketEventType.userUpdated:
             if let user = event.embedded(User.self, "user") {

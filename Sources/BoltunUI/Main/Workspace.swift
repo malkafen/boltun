@@ -7,6 +7,7 @@ import Observation
 enum RightPane: Equatable {
     case thread(String)
     case search
+    case members
 }
 
 struct ComposerTarget: Hashable, Sendable {
@@ -65,6 +66,9 @@ final class Workspace {
     var highlightedPostId: String?
     var searchFocusRequest = 0
     var threadSeenAt: [String: Int64] = [:]
+    var profilePopover: ProfilePresentation?
+    @ObservationIgnored var membersPanel: ChannelMembersModel?
+    @ObservationIgnored var membersSearchDebounce: Duration = .milliseconds(100)
     @ObservationIgnored var scrollReport = ScrollReport()
     @ObservationIgnored var scrollSequence = 0
     @ObservationIgnored var handledScrollSequence = 0

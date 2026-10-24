@@ -7,6 +7,7 @@ public enum DebugCommand: Equatable, Sendable {
         case sheet
         case settings
         case key
+        case popover
     }
 
     case snapshot(path: String, window: WindowTarget)
@@ -60,6 +61,12 @@ public enum DebugCommand: Equatable, Sendable {
     case channelMove(channel: String, category: String?, index: Int?)
     case categoryMove(category: String, index: Int)
     case categorySort(category: String, sorting: CategorySorting)
+    case members(on: Bool?)
+    case membersSearch(query: String)
+    case membersMore
+    case memberMessage(username: String)
+    case profile(ProfileTarget?)
+    case profileMessage
 
     public enum TeamMoveTarget: Equatable, Sendable {
         case team(String)
@@ -246,7 +253,7 @@ public enum DebugCommand: Equatable, Sendable {
             guard let category = nonEmpty(query["category"]), let sorting = query["sorting"].flatMap(categorySorting) else { return nil }
             return .categorySort(category: category, sorting: sorting)
         default:
-            return nil
+            return makeProfile(action: action, query: query)
         }
     }
 

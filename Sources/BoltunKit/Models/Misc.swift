@@ -127,6 +127,8 @@ public struct ClientConfig: Hashable, Sendable {
     public var enableCustomEmoji: Bool { values["EnableCustomEmoji"] == "true" }
 
     public var enableUserStatuses: Bool { values["EnableUserStatuses"] != "false" }
+    public var enableCustomUserStatuses: Bool { values["EnableCustomUserStatuses"] == "true" }
+    public var enableLastActiveTime: Bool { values["EnableLastActiveTime"] == "true" }
     public var collapsedThreads: String { values["CollapsedThreads"] ?? "disabled" }
     public var teammateNameDisplay: String { values["TeammateNameDisplay"] ?? "username" }
 }
