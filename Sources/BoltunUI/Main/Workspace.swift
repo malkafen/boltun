@@ -7,6 +7,7 @@ import Observation
 enum RightPane: Equatable {
     case thread(String)
     case search
+    case channelFiles(String)
 }
 
 struct ComposerTarget: Hashable, Sendable {
@@ -65,6 +66,10 @@ final class Workspace {
     var highlightedPostId: String?
     var searchFocusRequest = 0
     var threadSeenAt: [String: Int64] = [:]
+    var preparingPreviews: Set<String> = []
+    @ObservationIgnored let channelFiles: ChannelFilesModel
+    @ObservationIgnored var quickLook: (URL) -> Void = { QuickLookPanel.shared.preview($0) }
+    @ObservationIgnored var previewDirectory: URL = FileManager.default.temporaryDirectory.appending(path: "Boltun Previews")
     @ObservationIgnored var scrollReport = ScrollReport()
     @ObservationIgnored var scrollSequence = 0
     @ObservationIgnored var handledScrollSequence = 0
@@ -93,6 +98,7 @@ final class Workspace {
     init(session: ServerSession, serverURL: URL) {
         self.session = session
         self.serverURL = serverURL
+        channelFiles = ChannelFilesModel { query, page in await session.searchChannelFiles(query, page: page) }
     }
 
     func composer(for target: ComposerTarget) -> ComposerState {

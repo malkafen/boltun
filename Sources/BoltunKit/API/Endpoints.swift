@@ -243,6 +243,11 @@ public extension APIClient {
         return try await send(PostSearchResults.self, .post, "teams/\(teamId)/posts/search", json: body)
     }
 
+    func searchFiles(teamId: String?, _ request: FileSearchRequest) async throws -> FileSearchResults {
+        let path = teamId.flatMap { $0.isEmpty ? nil : "teams/\($0)/files/search" } ?? "files/search"
+        return try await send(FileSearchResults.self, .post, path, json: request)
+    }
+
     func flaggedPosts(userId: String, page: Int = 0, perPage: Int = 60) async throws -> PostList {
         try await send(PostList.self, .get, "users/\(userId)/posts/flagged", query: ["page": String(page), "per_page": String(perPage)])
     }

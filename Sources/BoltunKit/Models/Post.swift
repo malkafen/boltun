@@ -39,8 +39,24 @@ public struct FileInfo: Codable, Hashable, Identifiable, Sendable {
     public var width: Int
     public var height: Int
     public var hasPreviewImage: Bool
+    public var userId: String
+    public var channelId: String
+    public var createAt: Int64
 
-    public init(id: String, postId: String = "", name: String, extension: String = "", size: Int64 = 0, mimeType: String = "", width: Int = 0, height: Int = 0, hasPreviewImage: Bool = false) {
+    public init(
+        id: String,
+        postId: String = "",
+        name: String,
+        extension: String = "",
+        size: Int64 = 0,
+        mimeType: String = "",
+        width: Int = 0,
+        height: Int = 0,
+        hasPreviewImage: Bool = false,
+        userId: String = "",
+        channelId: String = "",
+        createAt: Int64 = 0
+    ) {
         self.id = id
         self.postId = postId
         self.name = name
@@ -50,6 +66,9 @@ public struct FileInfo: Codable, Hashable, Identifiable, Sendable {
         self.width = width
         self.height = height
         self.hasPreviewImage = hasPreviewImage
+        self.userId = userId
+        self.channelId = channelId
+        self.createAt = createAt
     }
 
     enum CodingKeys: String, CodingKey {
@@ -57,6 +76,9 @@ public struct FileInfo: Codable, Hashable, Identifiable, Sendable {
         case postId = "post_id"
         case mimeType = "mime_type"
         case hasPreviewImage = "has_preview_image"
+        case userId = "user_id"
+        case channelId = "channel_id"
+        case createAt = "create_at"
     }
 
     public init(from decoder: Decoder) throws {
@@ -70,6 +92,9 @@ public struct FileInfo: Codable, Hashable, Identifiable, Sendable {
         width = c.int(.width)
         height = c.int(.height)
         hasPreviewImage = c.value(.hasPreviewImage, default: false)
+        userId = c.value(.userId, default: "")
+        channelId = c.value(.channelId, default: "")
+        createAt = c.int64(.createAt)
     }
 
     public var isImage: Bool {

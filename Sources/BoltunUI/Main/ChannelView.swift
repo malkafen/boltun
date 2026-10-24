@@ -124,6 +124,11 @@ struct ChannelHeader: View {
                         MutedBellIcon(size: 11.5)
                             .help("Notifications are muted")
                     }
+                    if workspace.isChannelFilesEnabled {
+                        ChannelFilesHeaderButton(active: workspace.channelFilesChannelId != nil) {
+                            Task { await workspace.toggleChannelFiles() }
+                        }
+                    }
                     ChannelHeaderMenu(workspace: workspace, channel: channel)
                 }
                 let subtitle = ChannelHeader.subtitle(for: channel)

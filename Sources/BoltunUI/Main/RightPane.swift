@@ -10,6 +10,7 @@ struct RightPaneView: View {
             switch workspace.rightPane {
             case .thread(let rootId): ThreadPane(workspace: workspace, rootId: rootId)
             case .search: SearchPane(workspace: workspace)
+            case .channelFiles(let channelId): ChannelFilesPane(workspace: workspace, channelId: channelId)
             case nil: EmptyView()
             }
         }

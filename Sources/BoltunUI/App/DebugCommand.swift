@@ -60,6 +60,12 @@ public enum DebugCommand: Equatable, Sendable {
     case channelMove(channel: String, category: String?, index: Int?)
     case categoryMove(category: String, index: Int)
     case categorySort(category: String, sorting: CategorySorting)
+    case channelFiles(on: Bool)
+    case channelFilesFilter(FileTypeFilter)
+    case channelFilesSearch(String)
+    case channelFilesMore
+    case channelFile(index: Int, action: ChannelFileAction)
+    case quickLookClose
 
     public enum TeamMoveTarget: Equatable, Sendable {
         case team(String)
@@ -246,7 +252,7 @@ public enum DebugCommand: Equatable, Sendable {
             guard let category = nonEmpty(query["category"]), let sorting = query["sorting"].flatMap(categorySorting) else { return nil }
             return .categorySort(category: category, sorting: sorting)
         default:
-            return nil
+            return makeChannelFiles(action: action, query: query)
         }
     }
 
