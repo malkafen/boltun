@@ -74,6 +74,11 @@ public final class ServerSession {
     @ObservationIgnored public var isAppActive: () -> Bool = { true }
     @ObservationIgnored public var now: () -> Date = Date.init
     @ObservationIgnored public var typingTimeout: Duration = .seconds(6)
+    @ObservationIgnored public var presenceInterval: Duration = .seconds(60)
+    @ObservationIgnored public var presenceRecentPostLimit = 100
+    @ObservationIgnored public var presenceBatchLimit = 200
+    @ObservationIgnored var presenceTask: Task<Void, Never>?
+    @ObservationIgnored var requestedStatusIds = Set<String>()
     @ObservationIgnored let realtimeFactory: (URL, String) -> RealtimeClient
     @ObservationIgnored var realtime: RealtimeClient?
     @ObservationIgnored var realtimeTask: Task<Void, Never>?
@@ -278,6 +283,7 @@ public final class ServerSession {
             guard connection == .connecting else { return }
             connection = .connected
             startRealtime(token: token)
+            startPresence()
         } catch {
             guard connection == .connecting else { return }
             if APIError.isCancellation(error) {
@@ -300,6 +306,7 @@ public final class ServerSession {
     }
 
     func stopRealtime() {
+        stopPresence()
         realtimeTask?.cancel()
         realtimeTask = nil
         if let realtime { Task { await realtime.stop() } }
@@ -414,7 +421,7 @@ public final class ServerSession {
         for member in teamMembers { members[member.channelId] = member }
         categories[teamId] = teamCategories.sorted
         loadedTeams.insert(teamId)
-        var needed = Set<String>()
+        var needed: Set<String> = myId.isEmpty ? [] : [myId]
         for channel in teamChannels where channel.type == .direct {
             if let partner = channel.directPartnerId(me: myId) { needed.insert(partner) }
         }
@@ -587,7 +594,7 @@ public final class ServerSession {
         state.isLoading = true
         threads[rootId] = state
         do {
-            let list = try await client.postThread(postId: rootId)
+            let list = try await client.postThread(postId: rootId, collapsedThreads: collapsedThreads)
             ingest(list)
             guard var current = threads[rootId] else { return }
             let fetched = list.posts.values.filter { $0.id == rootId || $0.rootId == rootId }.map(\.id)
@@ -640,6 +647,7 @@ public final class ServerSession {
             let post = try await client.createPost(channelId: channelId, message: text, rootId: rootId, fileIds: fileIds, pendingPostId: pending.id)
             discardPending(pending.id)
             receive(post: post)
+            if !rootId.isEmpty { markFollowing(threadId: rootId, true) }
             return true
         } catch {
             discardPending(pending.id)
@@ -889,7 +897,7 @@ public final class ServerSession {
 
     public func refreshStatuses(_ ids: [String]) async {
         guard !ids.isEmpty, let found = await quietly({ try await client.statuses(userIds: ids) }) else { return }
-        for status in found { statuses[status.userId] = status.status }
+        for status in found where statuses[status.userId] != status.status { statuses[status.userId] = status.status }
     }
 
     func refreshCategories(teamId: String) async throws {
@@ -932,6 +940,8 @@ public final class ServerSession {
         }
         let ids = userIds.filter { users[$0] == nil }
         if !ids.isEmpty { Task { await self.ensureUsers(Array(ids)) } }
+        let authors = list.posts.values.filter { $0.overrideUsername == nil }.map(\.userId)
+        if authors.contains(where: { statuses[$0] == nil }) { Task { await self.refreshMissingStatuses(authors) } }
     }
 
     func insertIntoTimeline(_ post: Post) {

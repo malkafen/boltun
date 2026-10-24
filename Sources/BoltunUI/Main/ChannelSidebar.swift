@@ -178,6 +178,7 @@ struct SidebarHeader: View {
             .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
             .help([teamName, serverName].compactMap(\.self).joined(separator: " — ") + " — click to switch servers")
             Spacer(minLength: 4)
+            MyStatusMenu(session: workspace.session)
             Menu {
                 Button("Browse Channels") { workspace.showBrowseChannels = true }
                 Button("New Direct Message") { workspace.showDirectMessages = true }
@@ -201,6 +202,43 @@ struct SidebarHeader: View {
     var teamName: String { workspace.session.currentTeam?.displayName ?? "Boltun" }
 
     var serverName: String? { router?.model.selectedServer?.name }
+}
+
+struct MyStatusMenu: View {
+    let session: ServerSession
+
+    var status: UserStatusValue { session.statuses[session.myId] ?? .offline }
+
+    var avatarURL: URL? {
+        session.me.map { session.client.profileImageURL(userId: $0.id, lastPictureUpdate: $0.lastPictureUpdate) }
+    }
+
+    var body: some View {
+        let current = status
+        Menu {
+            ForEach(UserStatusValue.selectable, id: \.self) { option in
+                Button {
+                    Task { await session.setStatus(option) }
+                } label: {
+                    if option == current {
+                        Label(option.title, systemImage: "checkmark")
+                    } else {
+                        Text(option.title)
+                    }
+                }
+            }
+        } label: {
+            Avatar(url: avatarURL, client: session.client, name: session.me?.username ?? "", size: 26, status: current)
+                .contentShape(Circle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .pointerStyle(.link)
+        .help("Your status: \(current.title)")
+        .accessibilityLabel("Set status, currently \(current.title)")
+    }
 }
 
 struct FindChannelButton: View {

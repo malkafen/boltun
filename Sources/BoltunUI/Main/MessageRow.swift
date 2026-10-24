@@ -102,7 +102,9 @@ struct MessageRow: View, Equatable {
                     if !model.reactions.isEmpty { reactions }
                     if !inThread {
                         if let thread = model.thread {
-                            ThreadSummaryButton(summary: thread, client: workspace.session.client) { open(thread: post.id) }
+                            ThreadSummaryButton(summary: thread, client: workspace.session.client, following: model.following, onToggleFollow: toggleFollow) {
+                                open(thread: post.id)
+                            }
                         } else if model.replyCount > 0 {
                             replyButton
                         }
@@ -151,7 +153,7 @@ struct MessageRow: View, Equatable {
                 .opacity(hovering ? 1 : 0)
                 .help(model.fullTimeText)
         } else {
-            Avatar(url: model.avatarURL, client: workspace.session.client, name: model.authorName, size: 36)
+            Avatar(url: model.avatarURL, client: workspace.session.client, name: model.authorName, size: 36, status: model.authorStatus, statusRing: Theme.content)
         }
     }
 
@@ -226,7 +228,7 @@ struct MessageRow: View, Equatable {
     }
 
     var replyButton: some View {
-        Button { open(thread: post.id) } label: {
+        HoverLinkButton(action: { open(thread: post.id) }) {
             HStack(spacing: 4) {
                 Image(systemName: "arrowshape.turn.up.left.2")
                 Text(model.replyCount == 1 ? "1 reply" : "\(model.replyCount) replies")
@@ -234,7 +236,7 @@ struct MessageRow: View, Equatable {
             .scaledFont(12, weight: .semibold)
             .foregroundStyle(Theme.link)
         }
-        .buttonStyle(.plain)
+        .help("Open thread")
         .padding(.top, 2)
     }
 
@@ -277,6 +279,9 @@ struct MessageRow: View, Equatable {
         Button("Copy Text") { workspace.copyText(post) }
         Button("Copy Link") { workspace.copyLink(post) }
         Button(post.isPinned ? "Unpin from Channel" : "Pin to Channel") { Task { await workspace.togglePin(post) } }
+        if let following = model.following {
+            Button(following ? "Unfollow Thread" : "Follow Thread", action: toggleFollow)
+        }
         if model.isMine {
             Divider()
             Button("Delete", role: .destructive) { workspace.requestDelete(post) }
@@ -286,48 +291,133 @@ struct MessageRow: View, Equatable {
     func open(thread rootId: String) {
         Task { await workspace.openThread(rootId: rootId) }
     }
+
+    func toggleFollow() {
+        guard let following = model.following else { return }
+        Task { await workspace.setFollowing(threadId: post.id, !following) }
+    }
 }
 
 struct ThreadSummaryButton: View {
     let summary: ThreadSummary
     let client: APIClient?
+    var following: Bool?
+    var onToggleFollow: () -> Void = {}
     let action: () -> Void
+    @State private var hovering: Bool
+
+    init(summary: ThreadSummary, client: APIClient?, following: Bool? = nil, onToggleFollow: @escaping () -> Void = {}, hovering: Bool = false, action: @escaping () -> Void) {
+        self.summary = summary
+        self.client = client
+        self.following = following
+        self.onToggleFollow = onToggleFollow
+        self.action = action
+        _hovering = State(initialValue: hovering)
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Button(action: action) {
+                HStack(spacing: 4) {
+                    participants
+                    Text(summary.replyText)
+                        .scaledFont(12.5, weight: .semibold)
+                        .foregroundStyle(Theme.link)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(RoundedRectangle(cornerRadius: 5).fill(hovering ? Theme.linkHover : .clear))
+                    if !summary.lastReplyText.isEmpty {
+                        Text(summary.lastReplyText)
+                            .scaledFont(11.5)
+                            .foregroundStyle(Theme.textSecondary)
+                            .lineLimit(1)
+                    }
+                    if summary.hasNewReplies {
+                        Circle().fill(Theme.link).frame(width: 7, height: 7).padding(.leading, 2).help("New replies")
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .focusEffectDisabled()
+            .pointerStyle(.link)
+            .onHover { hovering = $0 }
+            .help("Open thread")
+            if let following {
+                ThreadFollowButton(following: following, action: onToggleFollow)
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    var participants: some View {
+        HStack(spacing: -6) {
+            ForEach(summary.participants) { participant in
+                Avatar(url: participant.avatarURL, client: client, name: participant.name, size: 20)
+                    .overlay(Circle().strokeBorder(Theme.content, lineWidth: 1.5))
+                    .help(participant.name)
+            }
+        }
+        .padding(.trailing, 4)
+    }
+}
+
+struct ThreadFollowButton: View {
+    let following: Bool
+    let action: () -> Void
+    @State private var hovering: Bool
+
+    init(following: Bool, hovering: Bool = false, action: @escaping () -> Void) {
+        self.following = following
+        self.action = action
+        _hovering = State(initialValue: hovering)
+    }
+
+    var title: String {
+        guard following else { return "Follow" }
+        return hovering ? "Unfollow" : "Following"
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: following ? (hovering ? "bell.slash" : "bell.fill") : "bell")
+                Text(title)
+            }
+            .scaledFont(11.5, weight: .semibold)
+            .foregroundStyle(following && !hovering ? Theme.link : (hovering ? Theme.textPrimary : Theme.textSecondary))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(hovering ? Color.white.opacity(0.08) : .clear))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .focusEffectDisabled()
+        .pointerStyle(.link)
+        .onHover { hovering = $0 }
+        .help(following ? "Stop following this thread" : "Follow this thread to get notified about new replies")
+        .accessibilityLabel(following ? "Unfollow thread" : "Follow thread")
+    }
+}
+
+struct HoverLinkButton<Label: View>: View {
+    let action: () -> Void
+    @ViewBuilder let label: () -> Label
     @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
-                HStack(spacing: -6) {
-                    ForEach(summary.participants) { participant in
-                        Avatar(url: participant.avatarURL, client: client, name: participant.name, size: 20)
-                            .overlay(Circle().strokeBorder(Theme.content, lineWidth: 1.5))
-                            .help(participant.name)
-                    }
-                }
-                Text(summary.replyText)
-                    .scaledFont(12.5, weight: .semibold)
-                    .foregroundStyle(Theme.link)
-                if !summary.lastReplyText.isEmpty {
-                    Text(summary.lastReplyText)
-                        .scaledFont(11.5)
-                        .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(1)
-                }
-                if summary.hasNewReplies {
-                    Circle().fill(Theme.link).frame(width: 7, height: 7).help("New replies")
-                }
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
-            .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? Theme.hover : .clear))
-            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(hovering ? Theme.border : .clear))
-            .contentShape(Rectangle())
+            label()
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(RoundedRectangle(cornerRadius: 5).fill(hovering ? Theme.linkHover : .clear))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focusEffectDisabled()
+        .pointerStyle(.link)
         .onHover { hovering = $0 }
-        .padding(.leading, -6)
-        .padding(.top, 2)
-        .help("Open thread")
+        .padding(.leading, -5)
     }
 }
 
@@ -353,6 +443,7 @@ struct ReplyIndicator: View {
             .foregroundStyle(Theme.textSecondary)
         }
         .buttonStyle(.plain)
+        .pointerStyle(.link)
         .help("Open thread")
     }
 }

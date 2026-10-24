@@ -97,6 +97,12 @@ public final class AppEnvironment: AutomationHost {
         windowController?.present()
     }
 
+    public func appDidBecomeActive() {
+        guard launched else { return }
+        let model = self.model
+        Task { await model.refreshSelectedPresence() }
+    }
+
     public func handle(url: URL) async {
         if DebugCommand.isDebugURL(url) {
             await automation.handle(url)

@@ -132,8 +132,13 @@ public extension APIClient {
         return try await send(PostList.self, .get, "channels/\(channelId)/posts", query: query)
     }
 
-    func postThread(postId: String) async throws -> PostList {
-        try await send(PostList.self, .get, "posts/\(postId)/thread")
+    func postThread(postId: String, collapsedThreads: Bool = false) async throws -> PostList {
+        let query = collapsedThreads ? ["collapsedThreads": "true", "collapsedThreadsExtended": "false"] : [:]
+        return try await send(PostList.self, .get, "posts/\(postId)/thread", query: query)
+    }
+
+    func setThreadFollowing(userId: String, teamId: String, threadId: String, following: Bool) async throws {
+        try await sendVoid(following ? .put : .delete, "users/\(userId)/teams/\(teamId)/threads/\(threadId)/following")
     }
 
     func post(id: String) async throws -> Post {

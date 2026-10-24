@@ -17,10 +17,18 @@ struct RightPaneView: View {
     }
 }
 
-struct PaneHeader: View {
+struct PaneHeader<Accessory: View>: View {
     let title: String
     var subtitle: String = ""
+    let accessory: Accessory
     let onClose: () -> Void
+
+    init(title: String, subtitle: String = "", onClose: @escaping () -> Void, @ViewBuilder accessory: () -> Accessory) {
+        self.title = title
+        self.subtitle = subtitle
+        self.onClose = onClose
+        self.accessory = accessory()
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -29,12 +37,19 @@ struct PaneHeader: View {
                 Text(subtitle).scaledFont(12).foregroundStyle(Theme.textSecondary).lineLimit(1)
             }
             Spacer()
+            accessory
             IconButton(systemName: "xmark", help: "Close", action: onClose)
         }
         .padding(.leading, 16)
         .padding(.trailing, 10)
         .frame(height: 56)
         .overlay(alignment: .bottom) { Rectangle().fill(Theme.separator).frame(height: 1) }
+    }
+}
+
+extension PaneHeader where Accessory == EmptyView {
+    init(title: String, subtitle: String = "", onClose: @escaping () -> Void) {
+        self.init(title: title, subtitle: subtitle, onClose: onClose) { EmptyView() }
     }
 }
 
@@ -48,7 +63,13 @@ struct ThreadPane: View {
         let root = session.posts[rootId]
         let channelName = root.flatMap { session.channels[$0.channelId] }.map { session.displayName(channel: $0) } ?? ""
         VStack(spacing: 0) {
-            PaneHeader(title: "Thread", subtitle: channelName) { workspace.closeRightPane() }
+            PaneHeader(title: "Thread", subtitle: channelName, onClose: { workspace.closeRightPane() }) {
+                if let following = workspace.threadFollowing {
+                    ThreadFollowButton(following: following) {
+                        Task { await workspace.setFollowing(threadId: rootId, !following) }
+                    }
+                }
+            }
             if items.isEmpty && session.threads[rootId]?.isLoading == true {
                 ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if root == nil && items.isEmpty {
@@ -141,7 +162,7 @@ struct SearchResultRow: View {
                         .foregroundStyle(Theme.textSecondary)
                 }
                 HStack(alignment: .top, spacing: 8) {
-                    Avatar(url: session.client.profileImageURL(userId: post.userId, lastPictureUpdate: session.users[post.userId]?.lastPictureUpdate ?? 0), client: session.client, name: session.displayName(for: post), size: 28)
+                    Avatar(url: session.client.profileImageURL(userId: post.userId, lastPictureUpdate: session.users[post.userId]?.lastPictureUpdate ?? 0), client: session.client, name: session.displayName(for: post), size: 28, status: post.overrideUsername == nil ? session.statuses[post.userId] : nil, statusRing: Theme.content)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(session.displayName(for: post)).scaledFont(13, weight: .semibold).foregroundStyle(Theme.textPrimary)
                         MessageBody(blocks: blocks, client: session.client)

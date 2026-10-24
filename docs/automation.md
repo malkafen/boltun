@@ -88,6 +88,8 @@ from the newest regular post, so `index=0` is the last one.
 | `team-move?team=<name>&to=<name>` | Moves a team onto another one, as dropping it there does. Use `end=favorites\|others` instead of `to` to move it to the end of a section. |
 | `link?url=<percent-encoded url>` | Handles a link as if it was clicked in a message, including permalinks and channel links. |
 | `notification-click?channel=<id>[&server=<index>][&team=<id>][&root=<id>]` | Routes a notification response the same way as clicking a delivered notification. |
+| `follow[?on=0][&post=<root id>]` | Follows the open thread (or the given root post), or unfollows it with `on=0`. The detail is the resulting state. |
+| `set-status?status=online\|away\|dnd\|offline` | Sets your own status, as the avatar menu in the sidebar header does. The detail is the resulting status. |
 | `command?name=<name>[&number=<n>]` | Runs a menu or keyboard command, listed below. |
 
 `command` names: `focus-search`, `focus-composer`, `quick-switcher`, `toggle-sidebar`, `toggle-pane`, `zoom-in`,
@@ -101,7 +103,8 @@ pane and thread posts, quick switcher and search results, the highlighted post, 
 the top and bottom, content height, unseen count for the new-messages pill, older-page requests), timeline size and paging flags, the last posts with reactions and files, both composers (text, editing post,
 suggestions, uploads, height), typing users, unread and mention channels, favorites, collapsed categories, open sheets,
 the last session error, the workspace and cached post counts, `editors`, the spell-checking and font size of every
-live composer text view, and `collapsedThreads`. Post summaries carry `replyCount`.
+live composer text view, `collapsedThreads`, `myStatus` and `threadFollowing` for the open thread. Post summaries carry
+`replyCount`, the author's `status` and, for root posts, `following`.
 
 Output paths must be absolute and inside `/tmp` or `/private/tmp`; paths containing `..` and existing symbolic links
 are rejected.

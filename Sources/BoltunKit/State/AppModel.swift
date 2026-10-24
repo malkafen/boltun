@@ -143,6 +143,12 @@ public final class AppModel {
         selectedServerId = serverId
         settings.lastServerId = serverId
         await restoreSelection(serverId: serverId)
+        await refreshSelectedPresence()
+    }
+
+    public func refreshSelectedPresence() async {
+        guard let session = selectedSession, session.connection == .connected else { return }
+        await session.refreshPresence()
     }
 
     public func selectServer(at index: Int) async {

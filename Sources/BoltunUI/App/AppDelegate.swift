@@ -16,6 +16,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         environment.launch()
     }
 
+    public func applicationDidBecomeActive(_ notification: Notification) {
+        environment.appDidBecomeActive()
+    }
+
     public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         environment.showMainWindow()
         return false

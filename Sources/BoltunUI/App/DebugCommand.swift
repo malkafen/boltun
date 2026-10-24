@@ -1,3 +1,4 @@
+import BoltunKit
 import Foundation
 
 public enum DebugCommand: Equatable, Sendable {
@@ -46,6 +47,8 @@ public enum DebugCommand: Equatable, Sendable {
     case teamMove(team: String, target: TeamMoveTarget)
     case link(url: URL)
     case notificationClick(server: Int, team: String, channel: String, root: String)
+    case follow(on: Bool, postId: String?)
+    case setStatus(UserStatusValue)
 
     public enum TeamMoveTarget: Equatable, Sendable {
         case team(String)
@@ -185,6 +188,11 @@ public enum DebugCommand: Equatable, Sendable {
         case "link":
             guard let url = query["url"].flatMap(URL.init(string:)), url.scheme != nil else { return nil }
             return .link(url: url)
+        case "follow":
+            return .follow(on: query["on"].map(flag) ?? true, postId: nonEmpty(query["post"]))
+        case "set-status":
+            guard let status = query["status"].flatMap(UserStatusValue.init(rawValue:)) else { return nil }
+            return .setStatus(status)
         default:
             return nil
         }

@@ -12,6 +12,8 @@ no bundled browser, no web view, just the Mattermost REST API and WebSocket.
 - Real-time messages, edits, deletions, reactions and typing indicators over WebSocket
 - Markdown rendering, emoji, @mentions, code blocks, links, file attachments and image previews
 - Collapsed reply threads (on by default): replies open in the thread pane with participants, reply count and last reply time; turn it off in Settings to show replies inline
+- Thread following: follow or unfollow a thread from its footer, the thread pane or the message menu; threads where you are mentioned, `@all`/`@channel` is used or one of your notification keywords appears are followed automatically, as the server's notification settings decide
+- Presence: online, away and do-not-disturb dots on message avatars, direct messages and search results, and your own status picker in the sidebar header
 - Search, quick channel switcher
 - Native notifications and a dock badge
 - Dark theme
