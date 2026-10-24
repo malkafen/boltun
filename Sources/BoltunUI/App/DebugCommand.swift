@@ -49,6 +49,11 @@ public enum DebugCommand: Equatable, Sendable {
     case notificationClick(server: Int, team: String, channel: String, root: String)
     case follow(on: Bool, postId: String?)
     case setStatus(UserStatusValue)
+    case acknowledge(index: Int, postId: String?)
+    case priority(PostPriority)
+    case burnOnRead(on: Bool)
+    case reveal(index: Int, postId: String?)
+    case burn(index: Int, postId: String?)
 
     public enum TeamMoveTarget: Equatable, Sendable {
         case team(String)
@@ -193,8 +198,32 @@ public enum DebugCommand: Equatable, Sendable {
         case "set-status":
             guard let status = query["status"].flatMap(UserStatusValue.init(rawValue:)) else { return nil }
             return .setStatus(status)
+        case "acknowledge":
+            return .acknowledge(index: index(query["index"]) ?? 0, postId: nonEmpty(query["post"]))
+        case "priority":
+            guard let level = query["level"].flatMap(priorityLevel) else { return nil }
+            return .priority(PostPriority(
+                priority: level,
+                requestedAck: flag(query["ack"]),
+                persistentNotifications: flag(query["notify"])
+            ))
+        case "burn-on-read":
+            return .burnOnRead(on: query["on"].map(flag) ?? true)
+        case "reveal":
+            return .reveal(index: index(query["index"]) ?? 0, postId: nonEmpty(query["post"]))
+        case "burn":
+            return .burn(index: index(query["index"]) ?? 0, postId: nonEmpty(query["post"]))
         default:
             return nil
+        }
+    }
+
+    static func priorityLevel(_ value: String) -> PostPriorityLevel? {
+        switch value.lowercased() {
+        case "standard", "none", "": return .standard
+        case "important": return .important
+        case "urgent": return .urgent
+        default: return nil
         }
     }
 

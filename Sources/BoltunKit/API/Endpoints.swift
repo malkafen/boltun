@@ -145,8 +145,24 @@ public extension APIClient {
         try await send(Post.self, .get, "posts/\(id)")
     }
 
-    func createPost(channelId: String, message: String, rootId: String = "", fileIds: [String] = [], pendingPostId: String = "") async throws -> Post {
-        let body = NewPost(channelId: channelId, message: message, rootId: rootId, fileIds: fileIds, pendingPostId: pendingPostId)
+    func createPost(
+        channelId: String,
+        message: String,
+        rootId: String = "",
+        fileIds: [String] = [],
+        pendingPostId: String = "",
+        priority: PostPriority? = nil,
+        postType: String = ""
+    ) async throws -> Post {
+        let body = NewPost(
+            channelId: channelId,
+            message: message,
+            rootId: rootId,
+            fileIds: fileIds,
+            pendingPostId: pendingPostId,
+            type: postType,
+            metadata: priority.map { NewPostMetadata(priority: $0) }
+        )
         return try await send(Post.self, .post, "posts", json: body)
     }
 
@@ -263,15 +279,21 @@ public extension APIClient {
     }
 }
 
+struct NewPostMetadata: Encodable {
+    var priority: PostPriority
+}
+
 struct NewPost: Encodable {
     var channelId: String
     var message: String
     var rootId: String
     var fileIds: [String]
     var pendingPostId: String
+    var type: String = ""
+    var metadata: NewPostMetadata?
 
     enum CodingKeys: String, CodingKey {
-        case message
+        case message, type, metadata
         case channelId = "channel_id"
         case rootId = "root_id"
         case fileIds = "file_ids"

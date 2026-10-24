@@ -14,11 +14,15 @@ no bundled browser, no web view, just the Mattermost REST API and WebSocket.
 - Collapsed reply threads (on by default): replies open in the thread pane with participants, reply count and last reply time; turn it off in Settings to show replies inline
 - Thread following: follow or unfollow a thread from its footer, the thread pane or the message menu; threads where you are mentioned, `@all`/`@channel` is used or one of your notification keywords appears are followed automatically, as the server's notification settings decide
 - Presence: online, away and do-not-disturb dots on message avatars, direct messages and search results, and your own status picker in the sidebar header
+- Message priority: send standard, important or urgent messages with an optional acknowledgement request and persistent notifications; priority labels appear next to the author
+- Acknowledgements: acknowledge a message that asked for it, see the count and who acknowledged it and when, updated live
+- Burn-on-read messages: recipients reveal a concealed message and watch its countdown, the sender sees how many recipients read it, and expired messages disappear by themselves
 - Search, quick channel switcher
 - Native notifications and a dock badge
 - Dark theme
 
-Audio and video calls are not supported.
+Priority, acknowledgements and burn-on-read follow the server: their controls stay hidden where the configuration or the
+license does not offer them. Audio and video calls are not supported.
 
 ## Install
 

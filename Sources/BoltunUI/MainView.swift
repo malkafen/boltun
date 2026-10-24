@@ -116,6 +116,12 @@ struct WorkspaceView: View {
         } message: {
             Text("This message will be permanently deleted for everyone.")
         }
+        .alert("Delete burn-on-read message?", isPresented: Binding(get: { workspace.pendingBurn != nil }, set: { if !$0 { workspace.pendingBurn = nil } })) {
+            Button("Delete", role: .destructive) { Task { await workspace.confirmBurn() } }
+            Button("Cancel", role: .cancel) { workspace.pendingBurn = nil }
+        } message: {
+            Text("The message is removed for everyone right away, whether or not they opened it.")
+        }
         .environment(\.openURL, OpenURLAction { url in
             Task { await workspace.handle(link: url) }
             return .handled

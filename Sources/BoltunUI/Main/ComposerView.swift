@@ -23,6 +23,7 @@ struct ComposerView: View {
                 .padding(.horizontal, 4)
                 .padding(.bottom, 5)
             }
+            if state.hasReadInfoLabels { ComposerReadInfoLabels(state: state) }
             VStack(alignment: .leading, spacing: 8) {
                 if !state.uploads.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -54,6 +55,8 @@ struct ComposerView: View {
                                 state.insert(":\(name): ")
                             }
                         }
+                    if state.supportsPriority { PostPriorityPickerButton(state: state) }
+                    if state.supportsBurnOnRead { BurnOnReadToggleButton(state: state) }
                     Spacer()
                     if state.showsLimit {
                         Text("\(state.remaining)")
