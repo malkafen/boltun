@@ -88,6 +88,7 @@ struct WorkspaceView: View {
                 HStack(spacing: 0) {
                     ChannelSidebar(workspace: workspace)
                         .frame(width: sidebarWidth)
+                        .clipped()
                     ResizeHandle(width: $sidebarWidth, range: 200...380, direction: 1)
                 }
                 .transition(.move(edge: .leading).combined(with: .opacity))

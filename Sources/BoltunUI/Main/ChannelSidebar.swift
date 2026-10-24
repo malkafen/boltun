@@ -143,7 +143,6 @@ struct SidebarHeader: View {
     @Environment(\.appRouter) private var router
 
     var body: some View {
-        let session = workspace.session
         HStack(spacing: 8) {
             Menu {
                 if let router {
@@ -152,27 +151,32 @@ struct SidebarHeader: View {
             } label: {
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 5) {
-                        Text(session.currentTeam?.displayName ?? "Boltun")
+                        Text(teamName)
                             .scaledFont(15, weight: .bold)
                             .foregroundStyle(Theme.textPrimary)
                             .lineLimit(1)
+                            .truncationMode(.tail)
                         Image(systemName: "chevron.down")
                             .scaledFont(10, weight: .bold)
                             .foregroundStyle(Theme.textSecondary)
+                            .fixedSize()
                     }
-                    if let serverName = router?.model.selectedServer?.name {
+                    if let serverName {
                         Text(serverName)
                             .scaledFont(11)
                             .foregroundStyle(Theme.textSecondary)
                             .lineLimit(1)
+                            .truncationMode(.tail)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
             .menuStyle(.button)
             .buttonStyle(.plain)
             .menuIndicator(.hidden)
-            .fixedSize()
-            .help("Switch servers")
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+            .help([teamName, serverName].compactMap(\.self).joined(separator: " — ") + " — click to switch servers")
             Spacer(minLength: 4)
             Menu {
                 Button("Browse Channels") { workspace.showBrowseChannels = true }
@@ -193,6 +197,10 @@ struct SidebarHeader: View {
         .padding(.horizontal, 14)
         .frame(height: 52)
     }
+
+    var teamName: String { workspace.session.currentTeam?.displayName ?? "Boltun" }
+
+    var serverName: String? { router?.model.selectedServer?.name }
 }
 
 struct FindChannelButton: View {

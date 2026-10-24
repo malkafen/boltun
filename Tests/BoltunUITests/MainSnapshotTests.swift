@@ -36,6 +36,31 @@ struct MainSnapshotTests {
         #expect(header.pixelsWide >= 250)
     }
 
+    @Test func longTeamNameTruncatesInsteadOfOverlappingTheRail() async {
+        let (model, _) = Fixture.appModel()
+        let workspace = Fixture.workspace()
+        workspace.session.teams[0].displayName = "Extremely Long Engineering Department Team Name That Never Fits"
+        let router = AppRouter(model: model)
+        for width in [CGFloat(200), 380] {
+            let view = HStack(spacing: 0) {
+                Color(red: 1, green: 0, blue: 0).frame(width: 64)
+                SidebarHeader(workspace: workspace).frame(width: width).background(Theme.sidebar)
+                Color(red: 0, green: 1, blue: 0).frame(width: 64)
+            }
+            .environment(\.appRouter, router)
+            let rep = await MainSnapshot.render(view, size: CGSize(width: width + 128, height: 52), name: "long-team-\(Int(width))")
+            let scale = CGFloat(rep.pixelsWide) / (width + 128)
+            for y in stride(from: 4, to: 48, by: 4) {
+                let left = rep.colorAt(x: Int(32 * scale), y: Int(CGFloat(y) * scale))?.usingColorSpace(.sRGB)
+                let right = rep.colorAt(x: Int((width + 96) * scale), y: Int(CGFloat(y) * scale))?.usingColorSpace(.sRGB)
+                #expect((left?.redComponent ?? 0) > 0.9 && (left?.greenComponent ?? 1) < 0.3, "left panel covered at y=\(y), width=\(width)")
+                #expect((right?.greenComponent ?? 0) > 0.9 && (right?.redComponent ?? 1) < 0.3, "right panel covered at y=\(y), width=\(width)")
+            }
+        }
+        let narrow = await MainSnapshot.render(ChannelSidebar(workspace: workspace), size: CGSize(width: 200, height: 300), name: "long-team-sidebar")
+        #expect(narrow.pixelsWide >= 200)
+    }
+
     @Test func workspaceWithThreadPane() async {
         let workspace = Fixture.workspace(transport: threadTransport())
         await workspace.openThread(rootId: "p1")
