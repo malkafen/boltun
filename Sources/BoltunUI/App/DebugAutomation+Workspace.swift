@@ -104,6 +104,8 @@ struct AutomationUIState: Codable, Equatable, Sendable {
     var sidebar: [SidebarCategorySummary] = []
     var toast: ToastSummary?
     var lastViewedAtOnOpen: Int64 = 0
+    var profile: ProfileSummary?
+    var members: MembersSummary?
 
     struct Editor: Codable, Equatable, Sendable {
         var spellChecking: Bool
@@ -302,6 +304,8 @@ extension DebugAutomation {
             return try await performSidebarOrder(command, session: session)
         case .toast(let action):
             return try performToast(action, workspace: workspace)
+        case .members, .membersSearch, .membersMore, .memberMessage, .profile, .profileMessage:
+            return try await performProfile(command, workspace: workspace)
         default:
             throw AutomationError.invalidCommand
         }
@@ -435,6 +439,7 @@ extension DebugAutomation {
                 switch pane {
                 case .thread(let id): return "thread:\(id)"
                 case .search: return "search"
+                case .members: return "members"
                 }
             },
             threadPosts: workspace.threadRootId.map { session.threadPosts(rootId: $0).map { Self.summary($0, session: session) } } ?? [],
@@ -474,7 +479,9 @@ extension DebugAutomation {
             readStatus: Self.readStatusTracking(session: session, channelId: channelId),
             sidebar: Self.sidebarSummary(session),
             toast: Self.toastSummary(workspace),
-            lastViewedAtOnOpen: timeline.lastViewedAtOnOpen
+            lastViewedAtOnOpen: timeline.lastViewedAtOnOpen,
+            profile: Self.profileSummary(workspace),
+            members: Self.membersSummary(workspace)
         )
     }
 

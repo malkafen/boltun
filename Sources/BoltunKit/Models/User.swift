@@ -16,6 +16,8 @@ public struct User: Codable, Hashable, Identifiable, Sendable {
     public var lastPictureUpdate: Int64
     public var notifyProps: [String: String]
     public var timezone: [String: String]
+    public var botDescription: String
+    public var props: [String: String]
 
     public init(
         id: String,
@@ -32,7 +34,9 @@ public struct User: Codable, Hashable, Identifiable, Sendable {
         updateAt: Int64 = 0,
         lastPictureUpdate: Int64 = 0,
         notifyProps: [String: String] = [:],
-        timezone: [String: String] = [:]
+        timezone: [String: String] = [:],
+        botDescription: String = "",
+        props: [String: String] = [:]
     ) {
         self.id = id
         self.username = username
@@ -49,10 +53,13 @@ public struct User: Codable, Hashable, Identifiable, Sendable {
         self.lastPictureUpdate = lastPictureUpdate
         self.notifyProps = notifyProps
         self.timezone = timezone
+        self.botDescription = botDescription
+        self.props = props
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, username, nickname, email, position, roles, locale, timezone
+        case id, username, nickname, email, position, roles, locale, timezone, props
+        case botDescription = "bot_description"
         case firstName = "first_name"
         case lastName = "last_name"
         case isBot = "is_bot"
@@ -79,6 +86,8 @@ public struct User: Codable, Hashable, Identifiable, Sendable {
         lastPictureUpdate = c.int64(.lastPictureUpdate)
         notifyProps = Self.stringMap(c, .notifyProps)
         timezone = Self.stringMap(c, .timezone)
+        botDescription = c.value(.botDescription, default: "")
+        props = Self.stringMap(c, .props)
     }
 
     private static func stringMap(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> [String: String] {
@@ -92,7 +101,19 @@ public struct User: Codable, Hashable, Identifiable, Sendable {
 
     public var isSystemAdmin: Bool { roles.split(separator: " ").contains("system_admin") }
 
+    public var isGuest: Bool { roles.split(separator: " ").contains("system_guest") }
+
     public var isDeactivated: Bool { deleteAt > 0 }
+
+    public var showsLastActive: Bool { props["show_last_active"] != "false" }
+
+    public var customStatus: CustomStatus? { props["customStatus"].flatMap(CustomStatus.init(json:)) }
+
+    public var currentTimezone: String? {
+        guard !timezone.isEmpty else { return nil }
+        let automatic = timezone["useAutomaticTimezone"] == "true"
+        return (automatic ? timezone["automaticTimezone"] : timezone["manualTimezone"]) ?? ""
+    }
 
     public func displayName(_ setting: NameDisplaySetting = .username) -> String {
         switch setting {

@@ -162,7 +162,8 @@ public final class DebugAutomation {
         switch command {
         case .snapshot(let path, let target):
             let window = try window(for: target)
-            guard let data = Snapshot.png(of: window) else { throw AutomationError.renderFailed }
+            let overlays = target == .popover ? Self.popoverWindows(excluding: window) : []
+            guard let data = Snapshot.png(of: window, overlays: overlays, overlayFill: NSColor(Theme.popover)) else { throw AutomationError.renderFailed }
             try Snapshot.write(data, to: path)
             return path
         case .addServer(let url, let name):
@@ -263,13 +264,17 @@ public final class DebugAutomation {
     func window(for target: DebugCommand.WindowTarget) throws -> NSWindow {
         let found: NSWindow?
         switch target {
-        case .main: found = host?.mainWindow
+        case .main, .popover: found = host?.mainWindow
         case .sheet: found = host?.mainWindow?.attachedSheet
         case .settings: found = NSApp.windows.first { $0.identifier?.rawValue.localizedCaseInsensitiveContains("settings") == true && $0.isVisible }
         case .key: found = NSApp.keyWindow
         }
         guard let found else { throw AutomationError.noWindow(target.rawValue) }
         return found
+    }
+
+    static func popoverWindows(excluding window: NSWindow) -> [NSWindow] {
+        NSApp.windows.filter { $0 !== window && $0.isVisible && String(describing: type(of: $0)).contains("Popover") }
     }
 
     static func connectionSummary(_ session: ServerSession?) -> String {

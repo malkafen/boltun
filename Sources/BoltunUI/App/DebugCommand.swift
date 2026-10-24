@@ -7,6 +7,7 @@ public enum DebugCommand: Equatable, Sendable {
         case sheet
         case settings
         case key
+        case popover
     }
 
     case snapshot(path: String, window: WindowTarget)
@@ -67,6 +68,13 @@ public enum DebugCommand: Equatable, Sendable {
         case dismiss
         case escape
     }
+
+    case members(on: Bool?)
+    case membersSearch(query: String)
+    case membersMore
+    case memberMessage(username: String)
+    case profile(ProfileTarget?)
+    case profileMessage
 
     public enum TeamMoveTarget: Equatable, Sendable {
         case team(String)
@@ -256,7 +264,7 @@ public enum DebugCommand: Equatable, Sendable {
             guard let toastAction = query["action"].flatMap(ToastAction.init(rawValue:)) else { return nil }
             return .toast(action: toastAction)
         default:
-            return nil
+            return makeProfile(action: action, query: query)
         }
     }
 

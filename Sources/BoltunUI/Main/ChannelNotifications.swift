@@ -192,6 +192,10 @@ struct ChannelHeaderMenu: View {
     var body: some View {
         Menu {
             ChannelNotifyMenuItems(workspace: workspace, channelId: channel.id, isDirect: channel.type.isDirectOrGroup)
+            if channel.type != .direct {
+                Divider()
+                Button("Members") { workspace.openMembers() }
+            }
         } label: {
             Image(systemName: "ellipsis")
                 .scaledFont(12, weight: .semibold)
@@ -204,7 +208,7 @@ struct ChannelHeaderMenu: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .pointerStyle(.link)
-        .help("Channel notification options")
+        .help("Channel options")
     }
 }
 

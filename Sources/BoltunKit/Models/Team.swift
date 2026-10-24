@@ -50,12 +50,14 @@ public struct TeamMember: Codable, Hashable, Sendable {
     public var userId: String
     public var roles: String
     public var deleteAt: Int64
+    public var schemeAdmin: Bool
 
-    public init(teamId: String, userId: String, roles: String = "team_user", deleteAt: Int64 = 0) {
+    public init(teamId: String, userId: String, roles: String = "team_user", deleteAt: Int64 = 0, schemeAdmin: Bool = false) {
         self.teamId = teamId
         self.userId = userId
         self.roles = roles
         self.deleteAt = deleteAt
+        self.schemeAdmin = schemeAdmin
     }
 
     enum CodingKeys: String, CodingKey {
@@ -63,6 +65,7 @@ public struct TeamMember: Codable, Hashable, Sendable {
         case teamId = "team_id"
         case userId = "user_id"
         case deleteAt = "delete_at"
+        case schemeAdmin = "scheme_admin"
     }
 
     public init(from decoder: Decoder) throws {
@@ -71,6 +74,7 @@ public struct TeamMember: Codable, Hashable, Sendable {
         userId = c.value(.userId, default: "")
         roles = c.value(.roles, default: "")
         deleteAt = c.int64(.deleteAt)
+        schemeAdmin = c.value(.schemeAdmin, default: false)
     }
 }
 

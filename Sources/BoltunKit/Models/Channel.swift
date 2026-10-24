@@ -106,6 +106,7 @@ public struct ChannelMember: Codable, Hashable, Sendable {
     public var urgentMentionCount: Int
     public var notifyProps: [String: String]
     public var lastUpdateAt: Int64
+    public var schemeAdmin: Bool
 
     public init(
         channelId: String,
@@ -118,11 +119,13 @@ public struct ChannelMember: Codable, Hashable, Sendable {
         mentionCountRoot: Int = 0,
         urgentMentionCount: Int = 0,
         notifyProps: [String: String] = [:],
-        lastUpdateAt: Int64 = 0
+        lastUpdateAt: Int64 = 0,
+        schemeAdmin: Bool = false
     ) {
         self.channelId = channelId
         self.userId = userId
         self.roles = roles
+        self.schemeAdmin = schemeAdmin
         self.lastViewedAt = lastViewedAt
         self.msgCount = msgCount
         self.msgCountRoot = msgCountRoot
@@ -145,6 +148,7 @@ public struct ChannelMember: Codable, Hashable, Sendable {
         case urgentMentionCount = "urgent_mention_count"
         case notifyProps = "notify_props"
         case lastUpdateAt = "last_update_at"
+        case schemeAdmin = "scheme_admin"
     }
 
     public init(from decoder: Decoder) throws {
@@ -161,6 +165,7 @@ public struct ChannelMember: Codable, Hashable, Sendable {
         let props: JSONObject = c.value(.notifyProps, default: [:])
         notifyProps = props.compactMapValues { $0.stringValue }
         lastUpdateAt = c.int64(.lastUpdateAt)
+        schemeAdmin = c.value(.schemeAdmin, default: false)
     }
 
     public var isMuted: Bool { notifyProps["mark_unread"] == "mention" }
