@@ -19,3 +19,43 @@ public enum Theme {
     public static let away = Color(red: 1.0, green: 0.74, blue: 0.20)
     public static let dnd = Color(red: 0.86, green: 0.25, blue: 0.25)
 }
+
+extension Theme {
+    public static let railTile = Color(red: 0.19, green: 0.20, blue: 0.24)
+    public static let railTileSelected = Color(red: 0.27, green: 0.45, blue: 0.78)
+    public static let sidebarHeader = Color(red: 0.12, green: 0.13, blue: 0.16)
+    public static let sidebarHover = Color.white.opacity(0.06)
+    public static let sidebarActive = Color.white.opacity(0.11)
+    public static let sidebarSectionTitle = Color.white.opacity(0.52)
+    public static let hover = Color.white.opacity(0.035)
+    public static let border = Color.white.opacity(0.12)
+    public static let inputBackground = Color(red: 0.10, green: 0.11, blue: 0.13)
+    public static let newMessages = Color(red: 0.94, green: 0.40, blue: 0.34)
+    public static let link = Color(red: 0.42, green: 0.62, blue: 1.0)
+    public static let mentionBadge = Color(red: 0.86, green: 0.27, blue: 0.29)
+    public static let reactionBackground = Color.white.opacity(0.06)
+    public static let reactionMine = Color(red: 0.33, green: 0.56, blue: 0.95).opacity(0.22)
+    public static let reactionMineBorder = Color(red: 0.33, green: 0.56, blue: 0.95).opacity(0.75)
+    public static let quoteBar = Color.white.opacity(0.24)
+    public static let offline = Color.white.opacity(0.38)
+    public static let warning = Color(red: 0.95, green: 0.62, blue: 0.20)
+    public static let errorBanner = Color(red: 0.62, green: 0.18, blue: 0.20)
+    public static let warningBanner = Color(red: 0.50, green: 0.36, blue: 0.10)
+    public static let overlayDim = Color.black.opacity(0.45)
+    public static let popover = Color(red: 0.16, green: 0.17, blue: 0.21)
+    public static let mentionRow = Color(red: 0.98, green: 0.80, blue: 0.30).opacity(0.07)
+    public static let mentionRowHover = Color(red: 0.98, green: 0.80, blue: 0.30).opacity(0.11)
+    public static let mentionRowBar = Color(red: 0.98, green: 0.78, blue: 0.30).opacity(0.75)
+    public static let editingHighlight = Color(red: 0.95, green: 0.70, blue: 0.25).opacity(0.10)
+    public static let avatarPalette: [Color] = [
+        Color(red: 0.36, green: 0.53, blue: 0.86),
+        Color(red: 0.55, green: 0.41, blue: 0.80),
+        Color(red: 0.20, green: 0.62, blue: 0.55),
+        Color(red: 0.82, green: 0.47, blue: 0.27),
+        Color(red: 0.75, green: 0.33, blue: 0.48),
+        Color(red: 0.42, green: 0.60, blue: 0.30),
+    ]
+
+    public static func messageFont(scale: Double = 1) -> Font { .system(size: 13.5 * scale) }
+    public static func codeFont(scale: Double = 1) -> Font { .system(size: 12.5 * scale, design: .monospaced) }
+}
