@@ -293,10 +293,9 @@ extension MockServer {
 
     @Test func stopsWhenTheAppGoesInactive() async {
         let server = server()
-        var active = true
-        let session = await open(server) { active }
+        let session = await open(server)
         #expect(session.isPollingReadStatus)
-        active = false
+        session.isAppActive = { false }
         #expect(await eventually { !session.isPollingReadStatus })
         let settled = server.memberRequests()
         try? await Task.sleep(for: .milliseconds(150))
