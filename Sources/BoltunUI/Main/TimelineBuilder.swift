@@ -73,13 +73,21 @@ enum TimelineItem: Identifiable, Equatable {
     case replies(Int)
     case post(MessageRowModel)
 
+    static let datePrefix = "date:"
+    static let newMessagesId = "new-messages"
+    static let repliesId = "replies"
+
     var id: String {
         switch self {
-        case .date(let title): return "date:\(title)"
-        case .newMessages: return "new-messages"
-        case .replies: return "replies"
+        case .date(let title): return Self.datePrefix + title
+        case .newMessages: return Self.newMessagesId
+        case .replies: return Self.repliesId
         case .post(let model): return model.post.id
         }
+    }
+
+    static func isPostId(_ id: String) -> Bool {
+        !id.hasPrefix(datePrefix) && id != newMessagesId && id != repliesId
     }
 }
 

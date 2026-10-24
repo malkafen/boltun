@@ -83,6 +83,8 @@ public enum DebugCommand: Equatable, Sendable {
     case channelFile(index: Int, action: ChannelFileAction)
     case quickLookClose
 
+    case probe(ProbeRequest)
+
     public enum TeamMoveTarget: Equatable, Sendable {
         case team(String)
         case endOfFavorites
@@ -271,7 +273,7 @@ public enum DebugCommand: Equatable, Sendable {
             guard let toastAction = query["action"].flatMap(ToastAction.init(rawValue:)) else { return nil }
             return .toast(action: toastAction)
         default:
-            return makeProfile(action: action, query: query) ?? makeChannelFiles(action: action, query: query)
+            return makeProfile(action: action, query: query) ?? makeChannelFiles(action: action, query: query) ?? makeProbe(action: action, query: query)
         }
     }
 

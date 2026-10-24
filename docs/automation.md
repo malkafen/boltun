@@ -59,6 +59,22 @@ From the Linux dev host, run the same commands through `ssh macbox@192.168.5.90`
 | `notify[?title=..&body=..]` | Delivers a test notification for the current channel. |
 | `quit` | Terminates the app. |
 
+### Timing probe
+
+With the flag on, the app also stamps when things reach the screen, for `scripts/bench/` (see
+[benchmark.md](benchmark.md)). The stamps are Unix times in seconds, taken after the frame that shows them has been
+committed. Every command other than `probe` restarts the clock: `command` in the report is when the app received it.
+The details are JSON.
+
+| Command | Effect |
+| --- | --- |
+| `probe?wait=posts[&since=launch][&timeout=<s>]` | Waits until the current channel shows post rows that appeared after the last command (or at any time since launch with `since=launch`). Reports `channel` and `shown`. |
+| `probe?wait=connected[&timeout=<s>]` | Waits until every server's WebSocket is connected once. Reports `connected`. |
+| `probe?wait=history[&count=<n>][&timeout=<s>]` | Without `count`, reports the current channel's loaded post `count` and whether `more` older posts exist. With `count`, first waits until more than `count` posts are loaded, or the channel intro (its first post) is on screen. `intro` and `shown` tell whether and when the intro appeared after the last command. |
+| `probe?freeze=1[&since=<unix time>]` | The longest main-thread stall in milliseconds (`freeze`) since the last command or the given time. A stall is a run loop pass of at least 4 ms. |
+
+The default timeout is 30 seconds; a wait that times out fails with `timeout`.
+
 ### Workspace interaction
 
 These commands act on the selected server's current channel. Commands that take `thread=1` target the reply composer

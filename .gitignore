@@ -4,3 +4,4 @@ build/
 *.xcodeproj
 coverage.lcov
 .DS_Store
+__pycache__/

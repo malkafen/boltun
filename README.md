@@ -4,6 +4,28 @@ A fast, native macOS client for [Mattermost](https://mattermost.com), built with
 It is a lightweight replacement for the Electron-based [Mattermost Desktop](https://github.com/mattermost/desktop):
 no bundled browser, no web view, just the Mattermost REST API and WebSocket.
 
+## Benchmark: Boltun vs Mattermost Desktop
+
+Both apps sign in to the same three servers and go through the same scripted steps: launch, idle, 35 channel, team
+and server switches, scrolling back through 1000 posts, 3 minutes of live traffic on all servers, idle. Measured on
+macOS 27 (Apple M4 Pro VM, 8 GB), medians of three runs. The scripts are in [`scripts/bench`](scripts/bench/run.sh).
+The full table, the method and what is still slower in Boltun (team switches, and going back to a server) are in
+[docs/benchmark.md](docs/benchmark.md).
+
+| | Mattermost Desktop 6.3.1 | Boltun |
+|:--|--:|--:|
+| Launch until the first channel shows its posts | 1.9 s | 0.55 s |
+| Launch until all three servers are connected | 2.1 s | 0.35 s |
+| Switch channel, team or server (median) | 113 ms | 99 ms |
+| Scroll a 1000-post channel back to its start | 4.7 s | 3.0 s |
+| Memory, idle after launch | 764 MB (12 processes) | 54 MB (1 process) |
+| Memory after 3 min of live traffic | 974 MB | 95 MB |
+| CPU time for 3 min of live traffic (all cores) | 20.6 s | 2.2 s |
+| CPU when idle | 3.7 % of a core | 0.0 % of a core |
+| App size on disk | 292 MB | 14 MB |
+
+<img src="docs/benchmark-usage.svg" alt="Memory and CPU time over the whole scenario: Mattermost Desktop stays between 0.75 and 1.5 GB and uses 62 s of CPU, Boltun stays under 0.1 GB and uses 11 s" width="860">
+
 ## Features
 
 - Multiple servers side by side, each with its own session and unread/mention badges

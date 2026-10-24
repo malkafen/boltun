@@ -75,6 +75,7 @@ public final class AppEnvironment: AutomationHost {
         notifications.install()
         if UserDefaults.standard.bool(forKey: DebugCommand.defaultsKey) {
             notifications.onDeliver = { DebugAutomation.appendToLog("notification \($0.channelId) \($0.title): \($0.body)") }
+            automation.probe.start(model: model)
         }
         badge.start()
         let model = self.model

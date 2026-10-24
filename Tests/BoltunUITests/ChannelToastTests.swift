@@ -710,8 +710,7 @@ enum InteractiveSession {
         let post = Post(id: "n1", createAt: Fixture.minutes(70), userId: "alice", channelId: "town", message: "fresh")
         workspace.session.posts["n1"] = post
         workspace.session.timelines["town"]?.postIds.append("n1")
-        await settle()
-        #expect(workspace.scrollReport.distanceFromBottom < 12, "\(workspace.scrollReport)")
+        #expect(await waitUntil { workspace.scrollReport.distanceFromBottom < 12 && workspace.scrollReport.contentHeight > 0 }, "\(workspace.scrollReport)")
         window.contentView = nil
         window.close()
     }
