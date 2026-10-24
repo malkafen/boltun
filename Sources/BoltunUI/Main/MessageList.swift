@@ -207,6 +207,7 @@ struct MessageListView: View {
         .scrollPosition($position)
         .onScrollTargetVisibilityChange(idType: String.self, threshold: 0.01) { ids in
             tracker.visibleIds = ids
+            AutomationProbe.shared.rowsVisible(channelId: channelId, ids: ids)
         }
         .onScrollGeometryChange(for: ScrollMetrics.self) { geometry in
             ScrollMetrics(
@@ -481,6 +482,7 @@ struct ChannelIntro: View {
             .padding(.horizontal, 20)
             .padding(.top, 28)
             .padding(.bottom, 12)
+            .onAppear { AutomationProbe.shared.introVisible(channelId: channelId) }
         }
     }
 

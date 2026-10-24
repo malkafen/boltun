@@ -127,15 +127,18 @@ public final class DebugAutomation {
     weak var host: AutomationHost?
     let isEnabled: () -> Bool
     let log: (String) -> Void
+    let probe: AutomationProbe
 
     public init(
         router: AppRouter,
         host: AutomationHost?,
+        probe: AutomationProbe = .shared,
         isEnabled: @escaping () -> Bool = { UserDefaults.standard.bool(forKey: DebugCommand.defaultsKey) },
         log: @escaping (String) -> Void = DebugAutomation.appendToLog
     ) {
         self.router = router
         self.host = host
+        self.probe = probe
         self.isEnabled = isEnabled
         self.log = log
     }
@@ -149,6 +152,7 @@ public final class DebugAutomation {
             log("error \(url.path()) invalid command")
             return true
         }
+        if !command.isProbe { probe.commandReceived() }
         do {
             let detail = try await perform(command)
             log("ok \(url.path())\(detail.isEmpty ? "" : " " + detail)")
@@ -251,6 +255,8 @@ public final class DebugAutomation {
         case .notificationClick(let index, let team, let channel, let root):
             await host?.activateNotification(NotificationRoute(serverId: try server(at: index).id, teamId: team, channelId: channel, rootId: root))
             return ""
+        case .probe(let request):
+            return try await performProbe(request)
         default:
             return try await performInteraction(command)
         }
