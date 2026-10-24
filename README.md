@@ -16,6 +16,7 @@ no bundled browser, no web view, just the Mattermost REST API and WebSocket.
 - Presence: online, away and do-not-disturb dots on message avatars, direct messages and search results, and your own status picker in the sidebar header
 - Search, quick channel switcher
 - Native notifications and a dock badge
+- Notification control: mute a channel or conversation from the sidebar or channel menu, and per-channel notification preferences (desktop level, thread replies, ignoring `@channel`/`@here`/`@all`); muted teams can be silenced locally from the team sidebar
 - Dark theme
 
 Audio and video calls are not supported.

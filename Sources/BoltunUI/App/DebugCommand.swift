@@ -49,6 +49,9 @@ public enum DebugCommand: Equatable, Sendable {
     case notificationClick(server: Int, team: String, channel: String, root: String)
     case follow(on: Bool, postId: String?)
     case setStatus(UserStatusValue)
+    case mute(on: Bool)
+    case notifyPrefs(mute: Bool?, desktop: NotificationLevel?, threads: Bool?, ignore: Bool?)
+    case teamMute(team: String, on: Bool)
 
     public enum TeamMoveTarget: Equatable, Sendable {
         case team(String)
@@ -193,9 +196,26 @@ public enum DebugCommand: Equatable, Sendable {
         case "set-status":
             guard let status = query["status"].flatMap(UserStatusValue.init(rawValue:)) else { return nil }
             return .setStatus(status)
+        case "mute":
+            return .mute(on: query["on"].map(flag) ?? true)
+        case "notify-prefs":
+            return notifyPrefs(query)
+        case "team-mute":
+            guard let team = nonEmpty(query["team"]) else { return nil }
+            return .teamMute(team: team, on: query["on"].map(flag) ?? true)
         default:
             return nil
         }
+    }
+
+    static func notifyPrefs(_ query: [String: String]) -> DebugCommand? {
+        let desktop = query["desktop"].flatMap(NotificationLevel.init(rawValue:))
+        guard query["desktop"] == nil || desktop != nil else { return nil }
+        let mute = query["mute"].map(flag)
+        let threads = query["threads"].map(flag)
+        let ignore = query["ignore"].map(flag)
+        guard mute != nil || desktop != nil || threads != nil || ignore != nil else { return nil }
+        return .notifyPrefs(mute: mute, desktop: desktop, threads: threads, ignore: ignore)
     }
 
     static func flag(_ value: String?) -> Bool {

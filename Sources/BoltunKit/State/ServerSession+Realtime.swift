@@ -233,7 +233,11 @@ extension ServerSession {
             me: me,
             member: members[post.channelId],
             myStatus: statuses[myId],
-            isViewingChannel: viewing
+            isViewingChannel: viewing,
+            isChannelWideMention: ChannelMention.isChannelWideOnly(message: post.message, user: me),
+            isTeamMuted: notificationsSuppressed(teamId: teamId, channelType: channelType),
+            isThreadReply: collapsedThreads && post.isReply,
+            isFollowingThread: followsThread(of: post)
         )
         guard shouldNotify else { return }
         let sender = event.string("sender_name").flatMap(\.nonEmpty).map { $0.hasPrefix("@") ? String($0.dropFirst()) : $0 } ?? displayName(for: post)

@@ -116,6 +116,8 @@ struct SidebarContextMenu: View {
             Button("Copy Link") { workspace.copyLink(channel) }
         }
         Divider()
+        ChannelNotifyMenuItems(workspace: workspace, channelId: row.id, isDirect: row.isDirect)
+        Divider()
         if row.isDirect {
             Button("Close Conversation") { Task { await workspace.closeConversation(channelId: row.id) } }
         } else if session.channels[row.id]?.name != "town-square" {
@@ -321,6 +323,9 @@ struct SidebarRow: View, Equatable {
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer(minLength: 4)
+                if row.muted {
+                    MutedBellIcon()
+                }
                 if row.mentions > 0 {
                     CountBadge(count: row.mentions, color: row.muted ? Color.white.opacity(0.25) : Theme.mentionBadge)
                 }

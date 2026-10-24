@@ -13,6 +13,7 @@ public struct AutomationState: Codable, Equatable, Sendable {
         public var user: String?
         public var teams: [String]
         public var favoriteTeams: [String]
+        public var mutedTeams: [String]
         public var team: String?
         public var channel: String?
         public var channelDisplayName: String?
@@ -50,6 +51,7 @@ public struct AutomationState: Codable, Equatable, Sendable {
                 user: session?.me?.username,
                 teams: session?.orderedTeams.map(\.name) ?? [],
                 favoriteTeams: session?.teamSections.favorites.map(\.name) ?? [],
+                mutedTeams: session.map { active in active.orderedTeams.filter { active.isMuted(teamId: $0.id) }.map(\.name) } ?? [],
                 team: session?.currentTeam?.name,
                 channel: session?.currentChannel?.name,
                 channelDisplayName: session?.currentChannel.map { session!.displayName(channel: $0) },
@@ -219,6 +221,9 @@ public final class DebugAutomation {
                 try currentWorkspace().showBrowseChannels = true
             case "dm":
                 try currentWorkspace().showDirectMessages = true
+            case "notifications":
+                let workspace = try currentWorkspace()
+                workspace.notificationPreferences = ChannelNotificationsTarget(id: try currentChannelId(workspace.session))
             default:
                 throw AutomationError.invalidCommand
             }

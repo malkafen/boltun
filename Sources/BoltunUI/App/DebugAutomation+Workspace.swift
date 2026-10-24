@@ -44,6 +44,7 @@ struct AutomationUIState: Codable, Equatable, Sendable {
     var typing: [String]
     var unreadChannels: [String]
     var mentionChannels: [String: Int]
+    var mutedChannels: [String]
     var favorites: [String]
     var collapsedCategories: [String]
     var sheets: [String]
@@ -191,6 +192,27 @@ extension DebugAutomation {
         case .setStatus(let status):
             await session.setStatus(status)
             return session.statuses[session.myId]?.rawValue ?? ""
+        case .mute(let on):
+            let channelId = try currentChannelId(session)
+            guard await session.setMuted(channelId: channelId, on) else {
+                throw AutomationError.failed(session.lastError ?? "could not change mute state")
+            }
+            return "\(session.isMuted(channelId: channelId))"
+        case .notifyPrefs(let mute, let desktop, let threads, let ignore):
+            let channelId = try currentChannelId(session)
+            var settings = session.notifySettings(channelId: channelId)
+            if let mute { settings.muted = mute }
+            if let desktop { settings.desktop = desktop }
+            if let threads { settings.desktopThreads = threads ? .all : .mention }
+            if let ignore { settings.ignoreChannelMentions = ignore ? .on : .off }
+            guard await session.applyNotifySettings(settings, channelId: channelId) else {
+                throw AutomationError.failed(session.lastError ?? "could not save notification preferences")
+            }
+            return Self.describe(session.notifySettings(channelId: channelId))
+        case .teamMute(let name, let on):
+            let team = try team(named: name, in: session)
+            session.setMuted(teamId: team.id, on)
+            return session.teamLayout.muted.joined(separator: ",")
         case .teamFavorite(let name, let on):
             let team = try team(named: name, in: session)
             session.setFavorite(teamId: team.id, favorite: on)
@@ -211,6 +233,20 @@ extension DebugAutomation {
     func team(named name: String, in session: ServerSession) throws -> Team {
         guard let team = session.team(named: name) else { throw AutomationError.failed("no team \(name)") }
         return team
+    }
+
+    func currentChannelId(_ session: ServerSession) throws -> String {
+        guard let channelId = session.currentChannelId else { throw AutomationError.failed("no channel") }
+        return channelId
+    }
+
+    static func describe(_ settings: ChannelNotifySettings) -> String {
+        [
+            "muted=\(settings.muted)",
+            "desktop=\(settings.desktop.rawValue)",
+            "threads=\(settings.desktopThreads.rawValue)",
+            "ignore=\(settings.ignoreChannelMentions.rawValue)",
+        ].joined(separator: " ")
     }
 
     func runCommand(_ name: String, number: Int?, workspace: Workspace) async throws -> String {
@@ -268,16 +304,19 @@ extension DebugAutomation {
         let rows = session.sidebar.flatMap(\.channelIds).compactMap { id in session.channels[id].map { (id, $0) } }
         var mentions: [String: Int] = [:]
         var unread: [String] = []
+        var muted: [String] = []
         for (id, channel) in rows {
             let value = session.unread(channelId: id)
             if value.mentions > 0 { mentions[session.displayName(channel: channel)] = value.mentions }
             if value.unread { unread.append(session.displayName(channel: channel)) }
+            if session.isMuted(channelId: id) { muted.append(session.displayName(channel: channel)) }
         }
         var sheets: [String] = []
         if workspace.showBrowseChannels { sheets.append("browse") }
         if workspace.showDirectMessages { sheets.append("direct-messages") }
         if workspace.previewFile != nil { sheets.append("image-preview") }
         if workspace.pendingDeletion != nil { sheets.append("delete-confirmation") }
+        if workspace.notificationPreferences != nil { sheets.append("notification-preferences") }
         let threadComposer = workspace.threadRootId.flatMap { rootId in
             session.posts[rootId].map { workspace.composer(for: ComposerTarget(channelId: $0.channelId, rootId: rootId)) }
         }
@@ -306,6 +345,7 @@ extension DebugAutomation {
             typing: session.typingUsers(channelId: channelId),
             unreadChannels: unread,
             mentionChannels: mentions,
+            mutedChannels: muted,
             favorites: session.sidebar.first { $0.type == .favorites }?.channelIds.compactMap { session.channels[$0].map(session.displayName(channel:)) } ?? [],
             collapsedCategories: session.sidebar.filter(\.collapsed).map(\.title),
             sheets: sheets,

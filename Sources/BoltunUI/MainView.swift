@@ -110,6 +110,9 @@ struct WorkspaceView: View {
         .sheet(isPresented: $workspace.showBrowseChannels) { BrowseChannelsSheet(workspace: workspace) }
         .sheet(isPresented: $workspace.showDirectMessages) { DirectMessageSheet(workspace: workspace) }
         .sheet(item: $workspace.previewFile) { file in ImagePreviewSheet(workspace: workspace, file: file) }
+        .sheet(item: $workspace.notificationPreferences) { target in
+            ChannelNotificationsSheet(workspace: workspace, channelId: target.id)
+        }
         .alert("Delete message?", isPresented: Binding(get: { workspace.pendingDeletion != nil }, set: { if !$0 { workspace.pendingDeletion = nil } })) {
             Button("Delete", role: .destructive) { Task { await workspace.confirmDelete() } }
             Button("Cancel", role: .cancel) { workspace.pendingDeletion = nil }

@@ -54,6 +54,7 @@ final class Workspace {
     var showDirectMessages = false
     var pendingDeletion: Post?
     var previewFile: FileInfo?
+    var notificationPreferences: ChannelNotificationsTarget?
     var downloading: Set<String> = []
     var recentEmojis: [String] = []
     var memberCounts: [String: Int] = [:]

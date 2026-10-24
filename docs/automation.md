@@ -51,7 +51,7 @@ From the Linux dev host, run the same commands through `ssh macbox@192.168.5.90`
 | `open?url=<percent-encoded url>` | Routes a `mattermost://`, `boltun://` or `https://` link as if it was opened from outside. |
 | `remove-server?server=<index>` | Removes the server at the given index, as the Settings window does. |
 | `setting?name=spellChecking\|collapsedThreads&value=0\|1` | Changes a preference: spell checking or collapsed reply threads. |
-| `present?sheet=add-server\|login\|browse\|dm[&server=<index>]` | Presents the add-server, login, browse-channels or direct-messages sheet. |
+| `present?sheet=add-server\|login\|browse\|dm\|notifications[&server=<index>]` | Presents the add-server, login, browse-channels, direct-messages or channel notification preferences sheet. |
 | `dismiss` | Dismisses the current sheet. |
 | `settings[?tab=servers\|general\|about]` | Opens the Settings window on a tab. |
 | `show` | Shows the main window. |
@@ -83,6 +83,9 @@ from the newest regular post, so `index=0` is the last one.
 | `join?channel=<name>` | Joins a public channel by name or display name. |
 | `leave` | Leaves the current channel. |
 | `favorite[?on=0]` | Adds the current channel to favorites, or removes it with `on=0`. |
+| `mute[?on=0]` | Mutes the current channel, or unmutes it with `on=0`. The detail is the resulting state. |
+| `notify-prefs[?mute=1][&desktop=default\|all\|mention\|none][&threads=default\|all\|mention][&ignore=1]` | Changes the current channel's notification preferences, as the Notification Preferences sheet does. `threads` also accepts `1`/`0` for all/mentions. The detail is the resulting settings. |
+| `team-mute?team=<name>[&on=0]` | Mutes notifications for a team, or unmutes it with `on=0`. The detail is the resulting state. |
 | `collapse?category=<title>[&collapsed=0]` | Collapses a sidebar category by title, or expands it with `collapsed=0`. `on` is accepted as an alias. |
 | `team-favorite?team=<name>[&on=0]` | Pins a team to the favorites above the divider in the team sidebar, or unpins it with `on=0`. The detail is the resulting team order. |
 | `team-move?team=<name>&to=<name>` | Moves a team onto another one, as dropping it there does. Use `end=favorites\|others` instead of `to` to move it to the end of a section. |
@@ -98,10 +101,10 @@ from the newest regular post, so `index=0` is the last one.
 
 ### UI state
 
-`state` lists teams in sidebar order with `favoriteTeams`, and also writes a `ui` object for the selected workspace. It includes the window title, first responder, open right
+`state` lists teams in sidebar order with `favoriteTeams` and `mutedTeams`, and also writes a `ui` object for the selected workspace. It includes the window title, first responder, open right
 pane and thread posts, quick switcher and search results, the highlighted post, the scroll report (distances from
 the top and bottom, content height, unseen count for the new-messages pill, older-page requests), timeline size and paging flags, the last posts with reactions and files, both composers (text, editing post,
-suggestions, uploads, height), typing users, unread and mention channels, favorites, collapsed categories, open sheets,
+suggestions, uploads, height), typing users, unread and mention channels, favorites, `mutedChannels`, collapsed categories, open sheets,
 the last session error, the workspace and cached post counts, `editors`, the spell-checking and font size of every
 live composer text view, `collapsedThreads`, `myStatus` and `threadFollowing` for the open thread. Post summaries carry
 `replyCount`, the author's `status` and, for root posts, `following`.

@@ -28,21 +28,25 @@ public enum NotificationPolicy {
         me: User,
         member: ChannelMember?,
         myStatus: UserStatusValue?,
-        isViewingChannel: Bool
+        isViewingChannel: Bool,
+        isChannelWideMention: Bool = false,
+        isTeamMuted: Bool = false,
+        isThreadReply: Bool = false,
+        isFollowingThread: Bool = true
     ) -> Bool {
         guard post.userId != me.id, !post.isSystemMessage, !post.isDeleted else { return false }
         guard post.props["from_webhook"]?.boolValue != true || mentioned || channelType.isDirectOrGroup else { return false }
-        if myStatus == .dnd || isViewingChannel || member?.isMuted == true { return false }
-        let channelLevel = member?.desktopNotifyLevel ?? "default"
-        let level = channelLevel == "default" ? (me.notifyProps["desktop"] ?? "mention") : channelLevel
-        switch level {
-        case "all":
-            return true
-        case "none":
-            return false
-        default:
-            return mentioned || channelType.isDirectOrGroup
+        if myStatus == .dnd || isViewingChannel || isTeamMuted { return false }
+        let settings = ChannelNotifySettings(member: member, user: me)
+        guard !settings.muted else { return false }
+        let level = settings.desktopLevel(user: me)
+        guard level != .none else { return false }
+        let counts = mentioned && !(isChannelWideMention && settings.ignoresChannelMentions(user: me))
+        if isThreadReply {
+            guard isFollowingThread else { return false }
+            return counts || level == .all || settings.desktopThreadsLevel(user: me) == .all
         }
+        return counts || level == .all || channelType.isDirectOrGroup
     }
 
     public static func preview(_ message: String, limit: Int = 200) -> String {
