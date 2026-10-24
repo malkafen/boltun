@@ -120,6 +120,11 @@ struct ChannelHeader: View {
                             .foregroundStyle(Theme.textSecondary)
                             .help("\(count) members")
                     }
+                    if session.isMuted(channelId: channel.id) {
+                        MutedBellIcon(size: 11.5)
+                            .help("Notifications are muted")
+                    }
+                    ChannelHeaderMenu(workspace: workspace, channel: channel)
                 }
                 let subtitle = ChannelHeader.subtitle(for: channel)
                 if !subtitle.isEmpty {

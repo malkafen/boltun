@@ -37,6 +37,8 @@ final class ComposerState {
     private(set) var pendingSends = 0
     private(set) var focusRevision = 0
     var editorHeight: CGFloat = 20
+    private(set) var priority = PostPriority()
+    private(set) var burnOnRead = false
 
     @ObservationIgnored private var suggestionTask: Task<Void, Never>?
     @ObservationIgnored private var sendChain: Task<Void, Never>?
@@ -69,6 +71,29 @@ final class ComposerState {
     }
 
     var hasSuggestions: Bool { !suggestions.isEmpty }
+
+    var supportsPriority: Bool { !target.isThread && session.postPriorityEnabled && editingPostId == nil }
+
+    var supportsBurnOnRead: Bool { !target.isThread && session.canSendBurnOnRead(channelId: target.channelId) && editingPostId == nil }
+
+    var hasReadInfoLabels: Bool { supportsPriority && !priority.isDefault || supportsBurnOnRead && burnOnRead }
+
+    func apply(priority newValue: PostPriority) {
+        guard supportsPriority else { return }
+        var resolved = newValue
+        if !session.acknowledgementsEnabled { resolved.requestedAck = false }
+        if !session.persistentNotificationsEnabled || resolved.priority != .urgent { resolved.persistentNotifications = false }
+        priority = resolved
+    }
+
+    func clearPriority() {
+        priority = PostPriority()
+    }
+
+    func setBurnOnRead(_ enabled: Bool) {
+        guard !enabled || supportsBurnOnRead else { return }
+        burnOnRead = enabled
+    }
 
     var keyContext: ComposerKeyContext {
         ComposerKeyContext(isEmpty: text.isEmpty, hasSuggestions: hasSuggestions, isEditing: editingPostId != nil)
@@ -156,12 +181,29 @@ final class ComposerState {
             let fileIds = uploadedFileIds
             let previousText = text
             let previousUploads = uploads
+            let previousPriority = priority
+            let previousBurnOnRead = burnOnRead
+            let sentPriority = supportsPriority ? priority : PostPriority()
+            let sentBurnOnRead = supportsBurnOnRead && burnOnRead
             replaceText("")
             uploads = []
+            priority = PostPriority()
+            burnOnRead = false
             operation = { [weak self] in
-                guard let self, !(await self.session.send(message, channelId: self.target.channelId, rootId: self.target.rootId, fileIds: fileIds)) else { return }
+                guard let self else { return }
+                let sent = await self.session.send(
+                    message,
+                    channelId: self.target.channelId,
+                    rootId: self.target.rootId,
+                    fileIds: fileIds,
+                    priority: sentPriority.isDefault ? nil : sentPriority,
+                    burnOnRead: sentBurnOnRead
+                )
+                guard !sent else { return }
                 self.replaceText(self.text.isEmpty ? previousText : self.text + "\n" + previousText)
                 self.uploads += previousUploads
+                if self.priority.isDefault { self.priority = previousPriority }
+                if !self.burnOnRead { self.burnOnRead = previousBurnOnRead }
             }
         }
         let previous = sendChain

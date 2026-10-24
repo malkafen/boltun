@@ -10,22 +10,39 @@ public struct TeamSections: Equatable, Sendable {
 public struct TeamLayout: Codable, Hashable, Sendable {
     public var order: [String]
     public var favorites: [String]
+    public var muted: [String]
 
-    public init(order: [String] = [], favorites: [String] = []) {
+    public init(order: [String] = [], favorites: [String] = [], muted: [String] = []) {
         self.order = order
         self.favorites = favorites
+        self.muted = muted
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         order = c.value(.order, default: [])
         favorites = c.value(.favorites, default: [])
+        muted = c.value(.muted, default: [])
     }
 
-    public var isEmpty: Bool { order.isEmpty && favorites.isEmpty }
+    public var isEmpty: Bool { order.isEmpty && favorites.isEmpty && muted.isEmpty }
 
     public func isFavorite(_ teamId: String) -> Bool {
         favorites.contains(teamId)
+    }
+
+    public func isMuted(_ teamId: String) -> Bool {
+        muted.contains(teamId)
+    }
+
+    public mutating func setMuted(_ teamId: String, _ mutedState: Bool, in teams: [Team]) {
+        guard isMuted(teamId) != mutedState else { return }
+        guard !mutedState || teams.contains(where: { $0.id == teamId }) else { return }
+        if mutedState {
+            muted.append(teamId)
+        } else {
+            muted.removeAll { $0 == teamId }
+        }
     }
 
     public func sections(_ teams: [Team]) -> TeamSections {

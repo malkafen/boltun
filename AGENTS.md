@@ -45,3 +45,7 @@ Two Mattermost servers run in Docker on the Linux dev host (`scripts/testenv/up.
 - `http://192.168.15.101:8065` (3 teams) and `http://192.168.15.101:8066` (2 teams)
 - user `boltun` / `Boltun-pass1` (system admin), sample users `sysadmin` / `Sys@dmin-sample1`
 - `scripts/testenv/chatter.py <url> <count> <delay>` posts live traffic (mentions, DMs, markdown) as `sysadmin`.
+
+A third server runs the Enterprise Edition image (`scripts/testenv/enterprise.sh`) at `http://192.168.15.101:8067`. It
+carries the built-in Entry license, so licensed features such as post acknowledgements and burn-on-read messages work.
+It has teams `alpha` and `beta` and users `boltun`, `sysadmin` and `user1` / `User1-pass1`.

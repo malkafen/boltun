@@ -45,6 +45,7 @@ public final class ServerSession {
     public var connection: ConnectionState = .idle
     public internal(set) var me: User?
     public internal(set) var config = ClientConfig(values: [:])
+    public internal(set) var license = ClientLicense(values: [:])
     public internal(set) var teams: [Team] = []
     public internal(set) var teamUnreads: [String: TeamUnread] = [:]
     public internal(set) var currentTeamId: String?
@@ -63,6 +64,8 @@ public final class ServerSession {
     public internal(set) var lastError: String?
     public internal(set) var pendingPostIds: Set<String> = []
     public internal(set) var collapsedThreads = false
+    public internal(set) var channelMemberCounts: [String: Int] = [:]
+    public internal(set) var revealingPostIds: Set<String> = []
     public var teamLayout = TeamLayout() {
         didSet { if teamLayout != oldValue { onTeamLayoutChange?(teamLayout) } }
     }
@@ -78,6 +81,8 @@ public final class ServerSession {
     @ObservationIgnored public var presenceRecentPostLimit = 100
     @ObservationIgnored public var presenceBatchLimit = 200
     @ObservationIgnored var presenceTask: Task<Void, Never>?
+    @ObservationIgnored var burnOnReadTask: Task<Void, Never>?
+    @ObservationIgnored var requestedStatsChannelIds = Set<String>()
     @ObservationIgnored var requestedStatusIds = Set<String>()
     @ObservationIgnored let realtimeFactory: (URL, String) -> RealtimeClient
     @ObservationIgnored var realtime: RealtimeClient?
@@ -307,6 +312,7 @@ public final class ServerSession {
 
     func stopRealtime() {
         stopPresence()
+        stopBurnOnReadExpiry()
         realtimeTask?.cancel()
         realtimeTask = nil
         if let realtime { Task { await realtime.stop() } }
@@ -361,6 +367,7 @@ public final class ServerSession {
         teamUnreads = Dictionary(unreads.map { ($0.teamId, $0) }, uniquingKeysWith: { a, _ in a })
         preferences = prefs
         loadedTeams.removeAll()
+        Task { await self.loadLicense() }
         if let teamId = currentTeamId {
             if teams.contains(where: { $0.id == teamId }) {
                 try await loadTeam(teamId)
@@ -628,9 +635,18 @@ public final class ServerSession {
     }
 
     @discardableResult
-    public func send(_ message: String, channelId: String, rootId: String = "", fileIds: [String] = []) async -> Bool {
+    public func send(
+        _ message: String,
+        channelId: String,
+        rootId: String = "",
+        fileIds: [String] = [],
+        priority: PostPriority? = nil,
+        burnOnRead: Bool = false
+    ) async -> Bool {
         let text = Self.normalizedMessage(message)
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !fileIds.isEmpty else { return false }
+        let sentPriority = effectivePriority(priority, rootId: rootId)
+        let postType = burnOnRead && burnOnReadEnabled && rootId.isEmpty ? PostType.burnOnRead : ""
         let pending = nextPendingPostId()
         addPending(Post(
             id: pending.id,
@@ -640,11 +656,21 @@ public final class ServerSession {
             channelId: channelId,
             rootId: rootId,
             message: text,
+            type: postType,
             fileIds: fileIds,
-            pendingPostId: pending.id
+            pendingPostId: pending.id,
+            metadata: PostMetadata(priority: sentPriority)
         ))
         do {
-            let post = try await client.createPost(channelId: channelId, message: text, rootId: rootId, fileIds: fileIds, pendingPostId: pending.id)
+            let post = try await client.createPost(
+                channelId: channelId,
+                message: text,
+                rootId: rootId,
+                fileIds: fileIds,
+                pendingPostId: pending.id,
+                priority: sentPriority,
+                postType: postType
+            )
             discardPending(pending.id)
             receive(post: post)
             if !rootId.isEmpty { markFollowing(threadId: rootId, true) }
@@ -926,7 +952,7 @@ public final class ServerSession {
             return
         }
         if existing.updateAt > post.updateAt { return }
-        posts[post.id] = post.mergingThreadSummary(from: existing)
+        posts[post.id] = post.mergingThreadSummary(from: existing).mergingReadInfo(from: existing)
     }
 
     func ingest(_ list: PostList) {
@@ -937,6 +963,9 @@ public final class ServerSession {
             userIds.formUnion(post.participantIds)
             for emoji in post.metadata.emojis { customEmojis[emoji.name] = emoji }
             for reaction in post.metadata.reactions { userIds.insert(reaction.userId) }
+            for acknowledgement in post.metadata.acknowledgements { userIds.insert(acknowledgement.userId) }
+            userIds.formUnion(post.metadata.recipients)
+            if post.isBurnOnRead { trackBurnOnRead(posts[post.id] ?? post) }
         }
         let ids = userIds.filter { users[$0] == nil }
         if !ids.isEmpty { Task { await self.ensureUsers(Array(ids)) } }
@@ -959,6 +988,7 @@ public final class ServerSession {
         let existed = posts[post.id] != nil
         store(post)
         for emoji in post.metadata.emojis { customEmojis[emoji.name] = emoji }
+        if post.isBurnOnRead { trackBurnOnRead(posts[post.id] ?? post) }
         insertIntoTimeline(post)
         if !post.rootId.isEmpty, var thread = threads[post.rootId], !thread.postIds.contains(post.id) {
             thread.postIds.append(post.id)

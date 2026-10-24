@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mmuser
+      POSTGRES_PASSWORD: mmuser-pass
+      POSTGRES_DB: mattermost
+    volumes:
+      - db:/var/lib/postgresql/data
+  app:
+    image: mattermost/mattermost-enterprise-edition:12.0.1
+    restart: unless-stopped
+    depends_on: [db]
+    ports:
+      - "8067:8065"
+    environment:
+      MM_SQLSETTINGS_DRIVERNAME: postgres
+      MM_SQLSETTINGS_DATASOURCE: postgres://mmuser:mmuser-pass@db:5432/mattermost?sslmode=disable&connect_timeout=10
+      MM_SERVICESETTINGS_SITEURL: http://${HOST_IP}:8067
+      MM_SERVICESETTINGS_ENABLELOCALMODE: "true"
+      MM_SERVICESETTINGS_ENABLEUSERACCESSTOKENS: "true"
+      MM_FEATUREFLAGS_BURNONREAD: "true"
+volumes:
+  db:

@@ -53,12 +53,16 @@ struct MessageRowModel: Equatable, Identifiable {
     var timeText: String
     var fullTimeText: String
     var blocks: [MessageBlock]
+    var priority: PostPriorityLevel = .standard
+    var acknowledgement: AcknowledgementRowModel?
+    var burnOnRead: BurnOnReadRowModel?
 
     static func == (lhs: MessageRowModel, rhs: MessageRowModel) -> Bool {
         lhs.post == rhs.post && lhs.authorName == rhs.authorName && lhs.avatarURL == rhs.avatarURL && lhs.authorStatus == rhs.authorStatus
             && lhs.isContinuation == rhs.isContinuation && lhs.isMine == rhs.isMine && lhs.mentionsMe == rhs.mentionsMe
             && lhs.replyContext == rhs.replyContext && lhs.replyCount == rhs.replyCount && lhs.thread == rhs.thread && lhs.reactions == rhs.reactions
-            && lhs.following == rhs.following && lhs.timeText == rhs.timeText
+            && lhs.following == rhs.following && lhs.timeText == rhs.timeText && lhs.priority == rhs.priority
+            && lhs.acknowledgement == rhs.acknowledgement && lhs.burnOnRead == rhs.burnOnRead
     }
 }
 
@@ -88,7 +92,13 @@ struct TimelineContext {
     var showReplyContext = true
     var collapsedThreads = false
     var followThreads = false
+    var postPriorityEnabled = false
+    var acknowledgementsEnabled = false
+    var burnOnReadEnabled = false
     var openThreadId: String?
+    var canToggleAcknowledgement: (String) -> Bool = { _ in false }
+    var burnOnReadReceipt: (String) -> BurnOnReadReceipt? = { _ in nil }
+    var isRevealing: (String) -> Bool = { _ in false }
     var displayName: (Post) -> String = { $0.userId }
     var userName: (String) -> String = { $0 }
     var post: (String) -> Post? = { _ in nil }
@@ -145,15 +155,21 @@ enum TimelineBuilder {
 
     static func canGroup(_ post: Post, after previous: Post) -> Bool {
         guard post.userId == previous.userId, !post.isSystemMessage, !previous.isSystemMessage else { return false }
+        guard !hasReadInfoHeader(post), !hasReadInfoHeader(previous) else { return false }
         guard post.overrideUsername == previous.overrideUsername else { return false }
         guard post.createAt - previous.createAt <= groupingWindow, post.createAt >= previous.createAt else { return false }
         if post.isReply { return post.rootId == previous.threadId }
         return !previous.isReply
     }
 
+    static func hasReadInfoHeader(_ post: Post) -> Bool {
+        post.priorityLevel.isLabelled || post.requestsAcknowledgement || post.isBurnOnRead
+    }
+
     static func row(for post: Post, previous: Post?, continuation: Bool, context: TimelineContext) -> MessageRowModel {
         let date = post.createAt.mattermostDate
         let isMine = post.userId == context.myId
+        let burn = burnOnRead(for: post, context: context)
         return MessageRowModel(
             post: post,
             authorName: context.displayName(post),
@@ -170,7 +186,45 @@ enum TimelineBuilder {
             reactions: reactions(for: post, context: context),
             timeText: TimeFormatting.time(date, calendar: context.calendar),
             fullTimeText: TimeFormatting.full(date, calendar: context.calendar),
-            blocks: post.isDeleted ? [] : context.render(post)
+            blocks: post.isDeleted || burn?.showsPlaceholder == true ? [] : context.render(post),
+            priority: context.postPriorityEnabled ? post.priorityLevel : .standard,
+            acknowledgement: acknowledgement(for: post, context: context),
+            burnOnRead: burn
+        )
+    }
+
+    static func acknowledgement(for post: Post, context: TimelineContext) -> AcknowledgementRowModel? {
+        guard context.acknowledgementsEnabled, post.requestsAcknowledgement, !post.isDeleted, post.pendingPostId != post.id else { return nil }
+        let people = post.acknowledgements.map { acknowledgement in
+            AcknowledgementPerson(
+                id: acknowledgement.userId,
+                name: context.userName(acknowledgement.userId),
+                timeText: TimeFormatting.short(acknowledgement.acknowledgedAt.mattermostDate, now: context.now, calendar: context.calendar),
+                isMe: acknowledgement.userId == context.myId,
+                avatarURL: context.userAvatarURL(acknowledgement.userId)
+            )
+        }
+        return AcknowledgementRowModel(
+            postId: post.id,
+            isAuthor: post.userId == context.myId,
+            acknowledgedByMe: post.acknowledgedAt(by: context.myId) != nil,
+            canToggle: context.canToggleAcknowledgement(post.id),
+            people: people
+        )
+    }
+
+    static func burnOnRead(for post: Post, context: TimelineContext) -> BurnOnReadRowModel? {
+        guard context.burnOnReadEnabled, post.isBurnOnRead, !post.isDeleted, post.pendingPostId != post.id else { return nil }
+        let isSender = post.userId == context.myId
+        return BurnOnReadRowModel(
+            postId: post.id,
+            authorName: context.displayName(post),
+            isSender: isSender,
+            isRevealed: post.isBurnOnReadRevealed(by: context.myId),
+            isRevealing: context.isRevealing(post.id),
+            expireAt: post.burnOnReadExpireAt,
+            readDurationMillis: post.burnOnReadReadDurationMillis,
+            receipt: isSender ? context.burnOnReadReceipt(post.id) : nil
         )
     }
 

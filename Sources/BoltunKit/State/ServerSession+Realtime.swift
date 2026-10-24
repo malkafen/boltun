@@ -145,6 +145,14 @@ extension ServerSession {
             if let emoji = event.embedded(CustomEmoji.self, "emoji") { customEmojis[emoji.name] = emoji }
         case WebSocketEventType.threadFollowChanged:
             applyFollowChange(event)
+        case WebSocketEventType.postAcknowledgementAdded, WebSocketEventType.postAcknowledgementRemoved:
+            handleAcknowledgementEvent(event, added: event.event == WebSocketEventType.postAcknowledgementAdded)
+        case WebSocketEventType.postRevealed:
+            handlePostRevealed(event)
+        case WebSocketEventType.postBurned:
+            handlePostBurned(event)
+        case WebSocketEventType.burnOnReadAllRevealed:
+            handleBurnOnReadAllRevealed(event)
         default:
             break
         }
@@ -157,9 +165,10 @@ extension ServerSession {
         if let old = posts[post.id] {
             if old.updateAt > post.updateAt { return }
             if merged.metadata.reactions.isEmpty { merged.metadata.reactions = old.metadata.reactions }
-            merged = merged.mergingThreadSummary(from: old)
+            merged = merged.mergingThreadSummary(from: old).mergingReadInfo(from: old)
         }
         posts[post.id] = merged
+        trackBurnOnRead(merged)
     }
 
     func handleTyping(_ event: WebSocketEvent) {
@@ -233,7 +242,11 @@ extension ServerSession {
             me: me,
             member: members[post.channelId],
             myStatus: statuses[myId],
-            isViewingChannel: viewing
+            isViewingChannel: viewing,
+            isChannelWideMention: ChannelMention.isChannelWideOnly(message: post.message, user: me),
+            isTeamMuted: notificationsSuppressed(teamId: teamId, channelType: channelType),
+            isThreadReply: collapsedThreads && post.isReply,
+            isFollowingThread: followsThread(of: post)
         )
         guard shouldNotify else { return }
         let sender = event.string("sender_name").flatMap(\.nonEmpty).map { $0.hasPrefix("@") ? String($0.dropFirst()) : $0 } ?? displayName(for: post)

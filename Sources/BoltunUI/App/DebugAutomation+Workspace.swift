@@ -3,6 +3,14 @@ import BoltunKit
 import Foundation
 
 struct AutomationUIState: Codable, Equatable, Sendable {
+    struct BurnOnReadSummary: Codable, Equatable, Sendable {
+        var isSender: Bool
+        var revealed: Bool
+        var expireAt: Int64
+        var readBy: Int
+        var recipients: Int?
+    }
+
     struct PostSummary: Codable, Equatable, Sendable {
         var id: String
         var user: String
@@ -14,6 +22,10 @@ struct AutomationUIState: Codable, Equatable, Sendable {
         var replyCount: Int = 0
         var following: Bool?
         var status: String?
+        var priority: String?
+        var requestedAck: Bool = false
+        var acknowledgedBy: [String] = []
+        var burnOnRead: BurnOnReadSummary?
     }
 
     struct Composer: Codable, Equatable, Sendable {
@@ -23,6 +35,18 @@ struct AutomationUIState: Codable, Equatable, Sendable {
         var selectedSuggestion: Int
         var uploads: [String]
         var height: Double
+        var priority: String = ""
+        var requestedAck = false
+        var persistentNotifications = false
+        var burnOnRead = false
+    }
+
+    struct ReadInfoFeatures: Codable, Equatable, Sendable {
+        var postPriority: Bool
+        var acknowledgements: Bool
+        var persistentNotifications: Bool
+        var burnOnRead: Bool
+        var licenseSku: String
     }
 
     var windowTitle: String
@@ -44,6 +68,7 @@ struct AutomationUIState: Codable, Equatable, Sendable {
     var typing: [String]
     var unreadChannels: [String]
     var mentionChannels: [String: Int]
+    var mutedChannels: [String]
     var favorites: [String]
     var collapsedCategories: [String]
     var sheets: [String]
@@ -54,6 +79,7 @@ struct AutomationUIState: Codable, Equatable, Sendable {
     var collapsedThreads = false
     var myStatus: String?
     var threadFollowing: Bool?
+    var readInfo: ReadInfoFeatures?
 
     struct Editor: Codable, Equatable, Sendable {
         var spellChecking: Bool
@@ -191,6 +217,51 @@ extension DebugAutomation {
         case .setStatus(let status):
             await session.setStatus(status)
             return session.statuses[session.myId]?.rawValue ?? ""
+        case .mute(let on):
+            let channelId = try currentChannelId(session)
+            guard await session.setMuted(channelId: channelId, on) else {
+                throw AutomationError.failed(session.lastError ?? "could not change mute state")
+            }
+            return "\(session.isMuted(channelId: channelId))"
+        case .notifyPrefs(let mute, let desktop, let threads, let ignore):
+            let channelId = try currentChannelId(session)
+            var settings = session.notifySettings(channelId: channelId)
+            if let mute { settings.muted = mute }
+            if let desktop { settings.desktop = desktop }
+            if let threads { settings.desktopThreads = threads ? .all : .mention }
+            if let ignore { settings.ignoreChannelMentions = ignore ? .on : .off }
+            guard await session.applyNotifySettings(settings, channelId: channelId) else {
+                throw AutomationError.failed(session.lastError ?? "could not save notification preferences")
+            }
+            return Self.describe(session.notifySettings(channelId: channelId))
+        case .teamMute(let name, let on):
+            let team = try team(named: name, in: session)
+            session.setMuted(teamId: team.id, on)
+            return session.teamLayout.muted.joined(separator: ",")
+        case .acknowledge(let index, let postId):
+            let target = try postId ?? post(workspace, fromEnd: index).id
+            await workspace.toggleAcknowledgement(postId: target)
+            return "\(session.posts[target]?.acknowledgements.count ?? 0)"
+        case .priority(let priority):
+            let state = try composer(workspace, thread: false)
+            guard state.supportsPriority else { throw AutomationError.failed("message priority disabled") }
+            state.apply(priority: priority)
+            return "\(state.priority.priority.rawValue):\(state.priority.requestedAck):\(state.priority.persistentNotifications)"
+        case .burnOnRead(let on):
+            let state = try composer(workspace, thread: false)
+            guard !on || state.supportsBurnOnRead else { throw AutomationError.failed("burn on read disabled") }
+            state.setBurnOnRead(on)
+            return "\(state.burnOnRead)"
+        case .reveal(let index, let postId):
+            let target = try postId ?? post(workspace, fromEnd: index).id
+            await workspace.revealBurnOnRead(postId: target)
+            return session.posts[target].map { "\($0.isBurnOnReadRevealed(by: session.myId))" } ?? "gone"
+        case .burn(let index, let postId):
+            let target = try postId ?? post(workspace, fromEnd: index).id
+            guard let post = session.posts[target] else { throw AutomationError.failed("no post \(target)") }
+            workspace.pendingBurn = post
+            await workspace.confirmBurn()
+            return target
         case .teamFavorite(let name, let on):
             let team = try team(named: name, in: session)
             session.setFavorite(teamId: team.id, favorite: on)
@@ -211,6 +282,20 @@ extension DebugAutomation {
     func team(named name: String, in session: ServerSession) throws -> Team {
         guard let team = session.team(named: name) else { throw AutomationError.failed("no team \(name)") }
         return team
+    }
+
+    func currentChannelId(_ session: ServerSession) throws -> String {
+        guard let channelId = session.currentChannelId else { throw AutomationError.failed("no channel") }
+        return channelId
+    }
+
+    static func describe(_ settings: ChannelNotifySettings) -> String {
+        [
+            "muted=\(settings.muted)",
+            "desktop=\(settings.desktop.rawValue)",
+            "threads=\(settings.desktopThreads.rawValue)",
+            "ignore=\(settings.ignoreChannelMentions.rawValue)",
+        ].joined(separator: " ")
     }
 
     func runCommand(_ name: String, number: Int?, workspace: Workspace) async throws -> String {
@@ -268,16 +353,20 @@ extension DebugAutomation {
         let rows = session.sidebar.flatMap(\.channelIds).compactMap { id in session.channels[id].map { (id, $0) } }
         var mentions: [String: Int] = [:]
         var unread: [String] = []
+        var muted: [String] = []
         for (id, channel) in rows {
             let value = session.unread(channelId: id)
             if value.mentions > 0 { mentions[session.displayName(channel: channel)] = value.mentions }
             if value.unread { unread.append(session.displayName(channel: channel)) }
+            if session.isMuted(channelId: id) { muted.append(session.displayName(channel: channel)) }
         }
         var sheets: [String] = []
         if workspace.showBrowseChannels { sheets.append("browse") }
         if workspace.showDirectMessages { sheets.append("direct-messages") }
         if workspace.previewFile != nil { sheets.append("image-preview") }
         if workspace.pendingDeletion != nil { sheets.append("delete-confirmation") }
+        if workspace.notificationPreferences != nil { sheets.append("notification-preferences") }
+        if workspace.pendingBurn != nil { sheets.append("burn-confirmation") }
         let threadComposer = workspace.threadRootId.flatMap { rootId in
             session.posts[rootId].map { workspace.composer(for: ComposerTarget(channelId: $0.channelId, rootId: rootId)) }
         }
@@ -306,6 +395,7 @@ extension DebugAutomation {
             typing: session.typingUsers(channelId: channelId),
             unreadChannels: unread,
             mentionChannels: mentions,
+            mutedChannels: muted,
             favorites: session.sidebar.first { $0.type == .favorites }?.channelIds.compactMap { session.channels[$0].map(session.displayName(channel:)) } ?? [],
             collapsedCategories: session.sidebar.filter(\.collapsed).map(\.title),
             sheets: sheets,
@@ -315,7 +405,14 @@ extension DebugAutomation {
             editors: Self.editors(in: host?.mainWindow?.contentView),
             collapsedThreads: session.collapsedThreads,
             myStatus: session.statuses[session.myId]?.rawValue,
-            threadFollowing: workspace.threadFollowing
+            threadFollowing: workspace.threadFollowing,
+            readInfo: AutomationUIState.ReadInfoFeatures(
+                postPriority: session.postPriorityEnabled,
+                acknowledgements: session.acknowledgementsEnabled,
+                persistentNotifications: session.persistentNotificationsEnabled,
+                burnOnRead: session.burnOnReadEnabled,
+                licenseSku: session.license.skuShortName
+            )
         )
     }
 
@@ -338,7 +435,22 @@ extension DebugAutomation {
             edited: post.isEdited,
             replyCount: post.replyCount,
             following: post.isReply ? nil : session.isFollowing(threadId: post.id),
-            status: session.statuses[post.userId]?.rawValue
+            status: session.statuses[post.userId]?.rawValue,
+            priority: post.priorityLevel.isLabelled ? post.priorityLevel.rawValue : nil,
+            requestedAck: post.requestsAcknowledgement,
+            acknowledgedBy: post.acknowledgements.map { session.displayName(userId: $0.userId) },
+            burnOnRead: burnOnReadSummary(post, session: session)
+        )
+    }
+
+    static func burnOnReadSummary(_ post: Post, session: ServerSession) -> AutomationUIState.BurnOnReadSummary? {
+        guard post.isBurnOnRead else { return nil }
+        return AutomationUIState.BurnOnReadSummary(
+            isSender: post.userId == session.myId,
+            revealed: post.isBurnOnReadRevealed(by: session.myId),
+            expireAt: post.burnOnReadExpireAt,
+            readBy: post.burnOnReadRevealedBy.count,
+            recipients: session.burnOnReadReceipt(postId: post.id)?.totalRecipients
         )
     }
 
@@ -355,7 +467,11 @@ extension DebugAutomation {
                 case .failed: return "\(upload.filename):failed"
                 }
             },
-            height: Double(composer.editorHeight)
+            height: Double(composer.editorHeight),
+            priority: composer.priority.priority.rawValue,
+            requestedAck: composer.priority.requestedAck,
+            persistentNotifications: composer.priority.persistentNotifications,
+            burnOnRead: composer.burnOnRead
         )
     }
 

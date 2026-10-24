@@ -111,4 +111,9 @@ public enum WebSocketEventType {
     public static let sidebarCategoryOrderUpdated = "sidebar_category_order_updated"
     public static let emojiAdded = "emoji_added"
     public static let threadFollowChanged = "thread_follow_changed"
+    public static let postAcknowledgementAdded = "post_acknowledgement_added"
+    public static let postAcknowledgementRemoved = "post_acknowledgement_removed"
+    public static let postRevealed = "post_revealed"
+    public static let postBurned = "post_burned"
+    public static let burnOnReadAllRevealed = "burn_on_read_all_revealed"
 }

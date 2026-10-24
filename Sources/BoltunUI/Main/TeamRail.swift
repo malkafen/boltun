@@ -11,13 +11,14 @@ struct TeamTileModel: Equatable, Identifiable {
     var mentions: Int
     var iconURL: URL?
     var favorite = false
+    var muted = false
     var previousId: String?
     var nextId: String?
 
     var shortcutLabel: String? { index < 9 ? "⌃⌘\(index + 1)" : nil }
 
     var tooltip: String {
-        [name, shortcutLabel].compactMap(\.self).joined(separator: " — ")
+        [name, shortcutLabel, muted ? "muted" : nil].compactMap(\.self).joined(separator: " — ")
     }
 
     @MainActor
@@ -40,6 +41,7 @@ struct TeamTileModel: Equatable, Identifiable {
                 mentions: unread.mentions,
                 iconURL: team.lastTeamIconUpdate > 0 ? session.client.teamIconURL(teamId: team.id, lastIconUpdate: team.lastTeamIconUpdate) : nil,
                 favorite: favorite,
+                muted: session.isMuted(teamId: team.id),
                 previousId: position > 0 ? section[position - 1].id : nil,
                 nextId: position + 1 < section.count ? section[position + 1].id : nil
             )
@@ -162,6 +164,9 @@ struct TeamTileMenu: View {
         Button(tile.favorite ? "Remove from Favorites" : "Add to Favorites") {
             session.setFavorite(teamId: tile.id, favorite: !tile.favorite)
         }
+        Button(ChannelNotifyLabels.teamMuteTitle(muted: tile.muted)) {
+            session.setMuted(teamId: tile.id, !tile.muted)
+        }
         if tile.previousId != nil || tile.nextId != nil {
             Divider()
         }
@@ -233,7 +238,7 @@ struct TeamTile: View, Equatable {
     var body: some View {
         HStack(spacing: 0) {
             UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0, bottomTrailingRadius: 3, topTrailingRadius: 3)
-                .fill(Color.white)
+                .fill(tile.muted && !tile.selected ? Color.white.opacity(0.35) : Color.white)
                 .frame(width: 4, height: indicatorHeight)
                 .animation(.easeOut(duration: 0.12), value: indicatorHeight)
             Spacer(minLength: 0)
@@ -241,8 +246,9 @@ struct TeamTile: View, Equatable {
                 icon
                     .frame(width: 40, height: 40)
                     .clipShape(RoundedRectangle(cornerRadius: tile.selected || hovering ? 12 : 16))
-                    .opacity(tile.selected || hovering ? 1 : 0.8)
+                    .opacity(tile.muted && !tile.selected ? 0.5 : (tile.selected || hovering ? 1 : 0.8))
                     .overlay(alignment: .topTrailing) { badge.offset(x: 7, y: -5) }
+                    .overlay(alignment: .bottomTrailing) { mutedIndicator.offset(x: 5, y: 4) }
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -267,11 +273,19 @@ struct TeamTile: View, Equatable {
 
     @ViewBuilder var badge: some View {
         if tile.mentions > 0 {
-            CountBadge(count: tile.mentions)
+            CountBadge(count: tile.mentions, color: tile.muted ? Color.white.opacity(0.25) : Theme.mentionBadge)
                 .overlay(Capsule().strokeBorder(Theme.serverRail, lineWidth: 2))
         } else if tile.unread && !tile.selected {
-            Circle().fill(Color.white).frame(width: 9, height: 9)
+            Circle().fill(tile.muted ? Color.white.opacity(0.35) : Color.white).frame(width: 9, height: 9)
                 .overlay(Circle().strokeBorder(Theme.serverRail, lineWidth: 2))
+        }
+    }
+
+    @ViewBuilder var mutedIndicator: some View {
+        if tile.muted {
+            MutedBellIcon(size: 9)
+                .padding(2)
+                .background(Circle().fill(Theme.serverRail))
         }
     }
 }

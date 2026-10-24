@@ -45,6 +45,13 @@ public struct AppCommands: Commands {
             Divider()
         }
 
+        CommandMenu("Channel") {
+            Button(muteTitle) { Task { await currentWorkspace?.toggleMuteCurrentChannel() } }
+                .disabled(currentChannelId == nil)
+            Button("Notification Preferences…") { currentWorkspace?.openNotificationPreferences() }
+                .disabled(currentChannelId == nil)
+        }
+
         CommandMenu("Go") {
             Button("Switch Channel…") { router.focusQuickSwitcher() }
                 .keyboardShortcut("k", modifiers: .command)
@@ -78,6 +85,24 @@ public struct AppCommands: Commands {
 
     var signOutTitle: String {
         model.selectedServer.map { "Sign Out of \($0.name)" } ?? "Sign Out"
+    }
+
+    var currentWorkspace: Workspace? {
+        model.selectedServerId.flatMap { router.workspaces.existing(serverId: $0) }
+    }
+
+    var currentChannelId: String? {
+        currentWorkspace?.session.currentChannelId
+    }
+
+    var muteTitle: String {
+        guard let workspace = currentWorkspace, let channelId = currentChannelId else {
+            return ChannelNotifyLabels.muteTitle(muted: false, isDirect: false)
+        }
+        return ChannelNotifyLabels.muteTitle(
+            muted: workspace.session.isMuted(channelId: channelId),
+            isDirect: workspace.session.channels[channelId]?.type.isDirectOrGroup ?? false
+        )
     }
 }
 
