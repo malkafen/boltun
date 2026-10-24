@@ -27,29 +27,28 @@ public indirect enum MessageBlock: Hashable, Sendable {
     case image(url: URL, alt: String)
 }
 
-public enum MarkupLink {
-    public static let mentionScheme = "boltun-mention"
-    public static let channelScheme = "boltun-channel"
-    public static let hashtagScheme = "boltun-hashtag"
-    public static let emojiScheme = "boltun-emoji"
-}
-
 public enum MessageRenderer {
     public static func render(_ message: String, context: MarkupContext = MarkupContext()) -> [MessageBlock] {
-        message.isEmpty ? [] : [.paragraph(AttributedString(message))]
+        guard !message.isEmpty else { return [] }
+        guard LargeStack.mayNestDeeply(message) else {
+            return MarkupRenderer(source: message, context: context).render()
+        }
+        return LargeStack.run { MarkupRenderer(source: message, context: context).render() }
+    }
+
+    public static func cached(_ message: String, context: MarkupContext = MarkupContext()) -> [MessageBlock] {
+        MessageRenderCache.shared.blocks(for: message, context: context)
     }
 
     public static func plainText(_ message: String) -> String {
-        message
-    }
-}
-
-public enum Emoji {
-    public static func unicode(for name: String) -> String? {
-        nil
+        plainText(message, context: MarkupContext())
     }
 
-    public static func search(_ prefix: String, limit: Int = 20) -> [(name: String, glyph: String)] {
-        []
+    public static func plainText(_ message: String, context: MarkupContext) -> String {
+        plainText(of: render(message, context: context))
+    }
+
+    public static func plainText(of blocks: [MessageBlock]) -> String {
+        PlainTextWriter.text(of: blocks)
     }
 }
