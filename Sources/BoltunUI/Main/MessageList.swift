@@ -129,7 +129,7 @@ final class ScrollTracker {
     }
 
     func liveFrame(of id: String) -> CGRect? {
-        visibleIds.contains(id) ? frames[id] : nil
+        visibleIds.isEmpty || visibleIds.contains(id) ? frames[id] : nil
     }
 
     func visibleRange(in items: [TimelineItem]) -> ClosedRange<Int>? {
@@ -457,7 +457,7 @@ struct MessageListView: View {
 
     static let focusPasses: [Duration] = [.milliseconds(30), .milliseconds(120), .milliseconds(300)]
     static let alignPasses: [Duration] = [.zero, .milliseconds(30), .milliseconds(120), .milliseconds(300)]
-    static let alignPassLimit = 40
+    static let alignPassLimit = 100
     static let settleDelay: Duration = .milliseconds(40)
 }
 

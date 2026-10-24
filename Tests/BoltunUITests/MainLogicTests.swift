@@ -531,9 +531,11 @@ import Testing
         #expect(tracker.visibleRange(in: items) == 1...2)
     }
 
-    @Test func liveFrameIgnoresFramesOfRowsThatAreNotVisible() {
+    @Test func liveFrameIgnoresFramesOfRowsThatAreNotVisibleWhenVisibilityIsKnown() {
         let tracker = ScrollTracker()
         tracker.frames["new-messages"] = CGRect(x: 0, y: -3200, width: 100, height: 20)
+        #expect(tracker.liveFrame(of: "new-messages")?.minY == -3200)
+        tracker.visibleIds = ["post-1"]
         #expect(tracker.liveFrame(of: "new-messages") == nil)
         tracker.visibleIds = ["new-messages"]
         #expect(tracker.liveFrame(of: "new-messages")?.minY == -3200)
