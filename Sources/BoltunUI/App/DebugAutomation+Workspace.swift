@@ -80,6 +80,7 @@ struct AutomationUIState: Codable, Equatable, Sendable {
     var myStatus: String?
     var threadFollowing: Bool?
     var readInfo: ReadInfoFeatures?
+    var sidebar: [SidebarCategorySummary] = []
 
     struct Editor: Codable, Equatable, Sendable {
         var spellChecking: Bool
@@ -274,6 +275,8 @@ extension DebugAutomation {
             case .endOfOthers: session.moveTeam(team.id, onto: .endOfOthers)
             }
             return session.orderedTeams.map(\.name).joined(separator: ",")
+        case .channelMove, .categoryMove, .categorySort:
+            return try await performSidebarOrder(command, session: session)
         default:
             throw AutomationError.invalidCommand
         }
@@ -412,7 +415,8 @@ extension DebugAutomation {
                 persistentNotifications: session.persistentNotificationsEnabled,
                 burnOnRead: session.burnOnReadEnabled,
                 licenseSku: session.license.skuShortName
-            )
+            ),
+            sidebar: Self.sidebarSummary(session)
         )
     }
 
