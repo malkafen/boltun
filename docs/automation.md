@@ -102,6 +102,12 @@ from the newest regular post, so `index=0` is the last one.
 | `reveal[?index=<n>][&post=<id>]` | Reveals a burn-on-read message you received, as clicking "View message" does. The detail is the resulting revealed state. |
 | `burn[?index=<n>][&post=<id>]` | Deletes a burn-on-read message for everyone, as confirming the fire badge does. |
 | `set-status?status=online\|away\|dnd\|offline` | Sets your own status, as the avatar menu in the sidebar header does. The detail is the resulting status. |
+| `channel-files[?on=0]` | Opens the Files pane for the current channel, as the "Channel files" header button does, or closes it with `on=0`. Fails when the server disables file attachments. The detail is the number of loaded files. |
+| `channel-files-filter?type=all\|documents\|spreadsheets\|presentations\|code\|images\|audio\|video` | Picks a file type in the pane's filter menu (`videos` is accepted too) and reloads the list. The detail is the number of loaded files. |
+| `channel-files-search[?q=<text>]` | Searches files in the pane's channel, as typing in "Search files" and pressing Return does. Without `q` the search is cleared and the recent files come back. |
+| `channel-files-more` | Loads the next page, as scrolling to the last row does. Nothing happens once the list is at its end. |
+| `channel-file?index=<n>[&action=preview\|open\|download\|copy-link]` | Acts on the n-th row (0-based) of the pane. `preview` (the default) opens images in the image preview sheet and other files in Quick Look; the detail is `image-preview` or `quick-look:<path>`. `open` jumps to the file's post ("Open in channel"), `download` saves it to Downloads, and `copy-link` copies the post permalink and returns it. |
+| `quick-look-close` | Closes the Quick Look panel. |
 | `command?name=<name>[&number=<n>]` | Runs a menu or keyboard command, listed below. |
 
 `command` names: `focus-search`, `focus-composer`, `quick-switcher`, `toggle-sidebar`, `toggle-pane`, `zoom-in`,
@@ -153,6 +159,14 @@ last-viewed time in milliseconds).
 `members` describes the open pane: `channel`, `count` (the header member count), `loaded` (profiles fetched by
 paging), `searchVisible`, `search`, `searching`, `canLoadMore` and up to 80 `items`, which are the section titles
 (`CHANNEL ADMINS`, `MEMBERS`) and rows as `Display Name @username [status]`.
+
+`rightPane` is `channel-files:<channel id>` while the Files pane is open. `channelFiles` describes the pane: `enabled`
+(the server allows file attachments, so the header button shows), `open`, `channelId`, `channel`, the section `title`
+(`Recent files` or `Search Results`), `filter` and `filterTitle`, the applied `query`, the search `terms` sent to the
+server, `loading`, `loadingMore`, `atEnd`, `nextPage`, `count`, the `empty` and `emptyDetail` texts when the empty state
+shows, the first 40 `files` (`id`, `name`, `kind`, `sender`, `size`, `date`, the `Direct Message`/`Group Message`
+`tag`, `postId` and whether a `thumbnail` image is used), `preparingPreviews` (file ids being fetched for Quick Look)
+and `quickLook`, the path shown in a visible Quick Look panel.
 
 Message read information is reported too. `readInfo` names the server-side gating (`postPriority`,
 `acknowledgements`, `persistentNotifications`, `burnOnRead` and the `licenseSku` they come from). Post summaries carry

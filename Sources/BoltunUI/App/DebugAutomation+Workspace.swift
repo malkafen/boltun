@@ -106,6 +106,7 @@ struct AutomationUIState: Codable, Equatable, Sendable {
     var lastViewedAtOnOpen: Int64 = 0
     var profile: ProfileSummary?
     var members: MembersSummary?
+    var channelFiles: ChannelFilesSummary?
 
     struct Editor: Codable, Equatable, Sendable {
         var spellChecking: Bool
@@ -306,6 +307,8 @@ extension DebugAutomation {
             return try performToast(action, workspace: workspace)
         case .members, .membersSearch, .membersMore, .memberMessage, .profile, .profileMessage:
             return try await performProfile(command, workspace: workspace)
+        case .channelFiles, .channelFilesFilter, .channelFilesSearch, .channelFilesMore, .channelFile, .quickLookClose:
+            return try await performChannelFiles(command, workspace: workspace)
         default:
             throw AutomationError.invalidCommand
         }
@@ -440,6 +443,7 @@ extension DebugAutomation {
                 case .thread(let id): return "thread:\(id)"
                 case .search: return "search"
                 case .members: return "members"
+                case .channelFiles(let id): return "channel-files:\(id)"
                 }
             },
             threadPosts: workspace.threadRootId.map { session.threadPosts(rootId: $0).map { Self.summary($0, session: session) } } ?? [],
@@ -481,7 +485,8 @@ extension DebugAutomation {
             toast: Self.toastSummary(workspace),
             lastViewedAtOnOpen: timeline.lastViewedAtOnOpen,
             profile: Self.profileSummary(workspace),
-            members: Self.membersSummary(workspace)
+            members: Self.membersSummary(workspace),
+            channelFiles: Self.channelFilesSummary(workspace, quickLook: QuickLookPanel.shared.visibleURL)
         )
     }
 

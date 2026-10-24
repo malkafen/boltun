@@ -127,6 +127,7 @@ public struct ClientConfig: Hashable, Sendable {
     public var enableOpenId: Bool { values["EnableSignUpWithOpenId"] == "true" }
     public var enableSaml: Bool { values["EnableSaml"] == "true" }
     public var enableCustomEmoji: Bool { values["EnableCustomEmoji"] == "true" }
+    public var enableFileAttachments: Bool { values["EnableFileAttachments"] != "false" }
 
     public var enableUserStatuses: Bool { values["EnableUserStatuses"] != "false" }
     public var enableCustomUserStatuses: Bool { values["EnableCustomUserStatuses"] == "true" }

@@ -1,4 +1,5 @@
 import AppKit
+import Quartz
 import SwiftUI
 
 @MainActor
@@ -58,5 +59,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     func open(_ url: URL) {
         let environment = self.environment
         Task { await environment.handle(url: url) }
+    }
+
+    nonisolated public override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool {
+        MainActor.assumeIsolated { QuickLookPanel.shared }.url != nil
+    }
+
+    nonisolated public override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        MainActor.assumeIsolated { QuickLookPanel.shared.attach(panel) }
+    }
+
+    nonisolated public override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        MainActor.assumeIsolated { QuickLookPanel.shared.detach(panel) }
     }
 }

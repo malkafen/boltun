@@ -8,6 +8,7 @@ enum RightPane: Equatable {
     case thread(String)
     case search
     case members
+    case channelFiles(String)
 }
 
 struct ComposerTarget: Hashable, Sendable {
@@ -69,6 +70,10 @@ final class Workspace {
     var profilePopover: ProfilePresentation?
     @ObservationIgnored var membersPanel: ChannelMembersModel?
     @ObservationIgnored var membersSearchDebounce: Duration = .milliseconds(100)
+    var preparingPreviews: Set<String> = []
+    @ObservationIgnored let channelFiles: ChannelFilesModel
+    @ObservationIgnored var quickLook: (URL) -> Void = { QuickLookPanel.shared.preview($0) }
+    @ObservationIgnored var previewDirectory: URL = FileManager.default.temporaryDirectory.appending(path: "Boltun Previews")
     @ObservationIgnored var scrollReport = ScrollReport()
     @ObservationIgnored var scrollSequence = 0
     @ObservationIgnored var handledScrollSequence = 0
@@ -102,6 +107,7 @@ final class Workspace {
         channelToast = ChannelToastModel(session: session)
         channelToast.requestScroll = { [weak self] target in self?.requestScroll(target) }
         channelToast.now = { [weak self] in self?.now() ?? Date() }
+        channelFiles = ChannelFilesModel { query, page in await session.searchChannelFiles(query, page: page) }
     }
 
     func composer(for target: ComposerTarget) -> ComposerState {
