@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="420" viewBox="0 0 860 420" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12">
+<style>
+  @media (prefers-color-scheme: dark) {
+    .surface { fill: #1a1a19 } .ink { fill: #f0efec } .muted { fill: #c3c2b7 } .grid { stroke: #2e2d2b } .axis { stroke: #55544f }
+    .phase { stroke: #6b6a64 }
+    .s0 { stroke: #d95926 } .f0 { fill: #d95926 } .s1 { stroke: #3987e5 } .f1 { fill: #3987e5 }
+  }
+</style>
+<rect class="surface" fill="#fcfcfb" width="860" height="420" rx="8"/>
+<text class="ink" fill="#0b0b0b" x="64" y="26" font-size="15" font-weight="600">Every switch: time until the posts are on screen (median of the runs)</text>
+<rect class="f0" fill="#eb6834" x="64" y="38" width="14" height="4" rx="2"/>
+<text class="muted" fill="#52514e" x="84" y="44">Mattermost Desktop 6.3.1</text>
+<rect class="f1" fill="#2a78d6" x="286.8" y="38" width="14" height="4" rx="2"/>
+<text class="muted" fill="#52514e" x="306.8" y="44">Boltun</text>
+<text class="muted" fill="#52514e" x="64" y="408">C channel, T team, S server switch, in the order of the scenario.</text>
+<line class="grid" stroke="#e4e3df" x1="64" x2="836" y1="344.0" y2="344.0"/>
+<text class="muted" fill="#52514e" x="56" y="348.0" text-anchor="end">0 ms</text>
+<line class="grid" stroke="#e4e3df" x1="64" x2="836" y1="257.3" y2="257.3"/>
+<text class="muted" fill="#52514e" x="56" y="261.3" text-anchor="end">100 ms</text>
+<line class="grid" stroke="#e4e3df" x1="64" x2="836" y1="170.7" y2="170.7"/>
+<text class="muted" fill="#52514e" x="56" y="174.7" text-anchor="end">200 ms</text>
+<line class="grid" stroke="#e4e3df" x1="64" x2="836" y1="84.0" y2="84.0"/>
+<text class="muted" fill="#52514e" x="56" y="88.0" text-anchor="end">300 ms</text>
+<rect class="f0" fill="#eb6834" x="67.1" y="215.4" width="6.9" height="128.6"/>
+<rect class="f1" fill="#2a78d6" x="75.0" y="256.2" width="6.9" height="87.8"/>
+<text class="muted" fill="#52514e" x="75.0" y="360" text-anchor="middle" font-size="10">C</text>
+<text class="muted" fill="#52514e" x="67.0" y="378" font-size="10">server 1</text>
+<line class="axis" stroke="#b8b7b1" x1="64.0" x2="64.0" y1="344" y2="368"/>
+<rect class="f0" fill="#eb6834" x="89.1" y="253.6" width="6.9" height="90.4"/>
+<rect class="f1" fill="#2a78d6" x="97.1" y="232.6" width="6.9" height="111.4"/>
+<text class="muted" fill="#52514e" x="97.1" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="111.2" y="244.2" width="6.9" height="99.8"/>
+<rect class="f1" fill="#2a78d6" x="119.1" y="259.2" width="6.9" height="84.8"/>
+<text class="muted" fill="#52514e" x="119.1" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="133.3" y="244.5" width="6.9" height="99.5"/>
+<rect class="f1" fill="#2a78d6" x="141.2" y="250.3" width="6.9" height="93.7"/>
+<text class="muted" fill="#52514e" x="141.2" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="155.3" y="275.6" width="6.9" height="68.4"/>
+<rect class="f1" fill="#2a78d6" x="163.3" y="284.4" width="6.9" height="59.6"/>
+<text class="muted" fill="#52514e" x="163.3" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="177.4" y="286.1" width="6.9" height="57.9"/>
+<rect class="f1" fill="#2a78d6" x="185.3" y="291.8" width="6.9" height="52.2"/>
+<text class="muted" fill="#52514e" x="185.3" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="199.4" y="222.8" width="6.9" height="121.2"/>
+<rect class="f1" fill="#2a78d6" x="207.4" y="118.0" width="6.9" height="226.0"/>
+<text class="muted" fill="#52514e" x="207.4" y="360" text-anchor="middle" font-size="10">T</text>
+<rect class="f0" fill="#eb6834" x="221.5" y="226.4" width="6.9" height="117.6"/>
+<rect class="f1" fill="#2a78d6" x="229.4" y="251.9" width="6.9" height="92.1"/>
+<text class="muted" fill="#52514e" x="229.4" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="243.5" y="242.8" width="6.9" height="101.2"/>
+<rect class="f1" fill="#2a78d6" x="251.5" y="227.3" width="6.9" height="116.7"/>
+<text class="muted" fill="#52514e" x="251.5" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="265.6" y="232.7" width="6.9" height="111.3"/>
+<rect class="f1" fill="#2a78d6" x="273.5" y="252.5" width="6.9" height="91.5"/>
+<text class="muted" fill="#52514e" x="273.5" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="287.7" y="237.7" width="6.9" height="106.3"/>
+<rect class="f1" fill="#2a78d6" x="295.6" y="136.6" width="6.9" height="207.4"/>
+<text class="muted" fill="#52514e" x="295.6" y="360" text-anchor="middle" font-size="10">T</text>
+<rect class="f0" fill="#eb6834" x="309.7" y="252.5" width="6.9" height="91.5"/>
+<rect class="f1" fill="#2a78d6" x="317.7" y="227.7" width="6.9" height="116.3"/>
+<text class="muted" fill="#52514e" x="317.7" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="331.8" y="256.4" width="6.9" height="87.6"/>
+<rect class="f1" fill="#2a78d6" x="339.7" y="253.3" width="6.9" height="90.7"/>
+<text class="muted" fill="#52514e" x="339.7" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="353.8" y="238.8" width="6.9" height="105.2"/>
+<rect class="f1" fill="#2a78d6" x="361.8" y="185.7" width="6.9" height="158.3"/>
+<text class="muted" fill="#52514e" x="361.8" y="360" text-anchor="middle" font-size="10">S</text>
+<text class="muted" fill="#52514e" x="353.7" y="378" font-size="10">server 2</text>
+<line class="axis" stroke="#b8b7b1" x1="350.7" x2="350.7" y1="344" y2="368"/>
+<rect class="f0" fill="#eb6834" x="375.9" y="235.1" width="6.9" height="108.9"/>
+<rect class="f1" fill="#2a78d6" x="383.8" y="244.8" width="6.9" height="99.2"/>
+<text class="muted" fill="#52514e" x="383.8" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="397.9" y="243.8" width="6.9" height="100.2"/>
+<rect class="f1" fill="#2a78d6" x="405.9" y="260.9" width="6.9" height="83.1"/>
+<text class="muted" fill="#52514e" x="405.9" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="420.0" y="241.6" width="6.9" height="102.4"/>
+<rect class="f1" fill="#2a78d6" x="427.9" y="268.3" width="6.9" height="75.7"/>
+<text class="muted" fill="#52514e" x="427.9" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="442.1" y="263.1" width="6.9" height="80.9"/>
+<rect class="f1" fill="#2a78d6" x="450.0" y="218.9" width="6.9" height="125.1"/>
+<text class="muted" fill="#52514e" x="450.0" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="464.1" y="281.6" width="6.9" height="62.4"/>
+<rect class="f1" fill="#2a78d6" x="472.1" y="278.7" width="6.9" height="65.3"/>
+<text class="muted" fill="#52514e" x="472.1" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="486.2" y="216.9" width="6.9" height="127.1"/>
+<rect class="f1" fill="#2a78d6" x="494.1" y="163.9" width="6.9" height="180.1"/>
+<text class="muted" fill="#52514e" x="494.1" y="360" text-anchor="middle" font-size="10">T</text>
+<rect class="f0" fill="#eb6834" x="508.2" y="250.0" width="6.9" height="94.0"/>
+<rect class="f1" fill="#2a78d6" x="516.2" y="266.4" width="6.9" height="77.6"/>
+<text class="muted" fill="#52514e" x="516.2" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="530.3" y="250.5" width="6.9" height="93.5"/>
+<rect class="f1" fill="#2a78d6" x="538.2" y="262.1" width="6.9" height="81.9"/>
+<text class="muted" fill="#52514e" x="538.2" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="552.3" y="239.5" width="6.9" height="104.5"/>
+<rect class="f1" fill="#2a78d6" x="560.3" y="161.6" width="6.9" height="182.4"/>
+<text class="muted" fill="#52514e" x="560.3" y="360" text-anchor="middle" font-size="10">S</text>
+<text class="muted" fill="#52514e" x="552.3" y="378" font-size="10">server 3</text>
+<line class="axis" stroke="#b8b7b1" x1="549.3" x2="549.3" y1="344" y2="368"/>
+<rect class="f0" fill="#eb6834" x="574.4" y="229.6" width="6.9" height="114.4"/>
+<rect class="f1" fill="#2a78d6" x="582.3" y="250.3" width="6.9" height="93.7"/>
+<text class="muted" fill="#52514e" x="582.3" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="596.5" y="246.2" width="6.9" height="97.8"/>
+<rect class="f1" fill="#2a78d6" x="604.4" y="271.8" width="6.9" height="72.2"/>
+<text class="muted" fill="#52514e" x="604.4" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="618.5" y="218.8" width="6.9" height="125.2"/>
+<rect class="f1" fill="#2a78d6" x="626.5" y="158.5" width="6.9" height="185.5"/>
+<text class="muted" fill="#52514e" x="626.5" y="360" text-anchor="middle" font-size="10">T</text>
+<rect class="f0" fill="#eb6834" x="640.6" y="245.8" width="6.9" height="98.2"/>
+<rect class="f1" fill="#2a78d6" x="648.5" y="251.3" width="6.9" height="92.7"/>
+<text class="muted" fill="#52514e" x="648.5" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="662.6" y="339.4" width="6.9" height="4.6"/>
+<rect class="f1" fill="#2a78d6" x="670.6" y="264.8" width="6.9" height="79.2"/>
+<text class="muted" fill="#52514e" x="670.6" y="360" text-anchor="middle" font-size="10">S</text>
+<text class="muted" fill="#52514e" x="662.5" y="378" font-size="10">server 1</text>
+<line class="axis" stroke="#b8b7b1" x1="659.5" x2="659.5" y1="344" y2="368"/>
+<rect class="f0" fill="#eb6834" x="684.7" y="229.2" width="6.9" height="114.8"/>
+<rect class="f1" fill="#2a78d6" x="692.6" y="236.2" width="6.9" height="107.8"/>
+<text class="muted" fill="#52514e" x="692.6" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="706.7" y="251.0" width="6.9" height="93.0"/>
+<rect class="f1" fill="#2a78d6" x="714.7" y="229.0" width="6.9" height="115.0"/>
+<text class="muted" fill="#52514e" x="714.7" y="360" text-anchor="middle" font-size="10">T</text>
+<rect class="f0" fill="#eb6834" x="728.8" y="281.2" width="6.9" height="62.8"/>
+<rect class="f1" fill="#2a78d6" x="736.7" y="260.2" width="6.9" height="83.8"/>
+<text class="muted" fill="#52514e" x="736.7" y="360" text-anchor="middle" font-size="10">C</text>
+<rect class="f0" fill="#eb6834" x="750.9" y="339.8" width="6.9" height="4.2"/>
+<rect class="f1" fill="#2a78d6" x="758.8" y="271.8" width="6.9" height="72.2"/>
+<text class="muted" fill="#52514e" x="758.8" y="360" text-anchor="middle" font-size="10">S</text>
+<text class="muted" fill="#52514e" x="750.8" y="378" font-size="10">2</text>
+<line class="axis" stroke="#b8b7b1" x1="747.8" x2="747.8" y1="344" y2="368"/>
+<rect class="f0" fill="#eb6834" x="772.9" y="251.6" width="6.9" height="92.4"/>
+<rect class="f1" fill="#2a78d6" x="780.9" y="266.6" width="6.9" height="77.4"/>
+<text class="muted" fill="#52514e" x="780.9" y="360" text-anchor="middle" font-size="10">T</text>
+<rect class="f0" fill="#eb6834" x="795.0" y="340.1" width="6.9" height="3.9"/>
+<rect class="f1" fill="#2a78d6" x="802.9" y="272.7" width="6.9" height="71.3"/>
+<text class="muted" fill="#52514e" x="802.9" y="360" text-anchor="middle" font-size="10">S</text>
+<text class="muted" fill="#52514e" x="794.9" y="378" font-size="10">3</text>
+<line class="axis" stroke="#b8b7b1" x1="791.9" x2="791.9" y1="344" y2="368"/>
+<rect class="f0" fill="#eb6834" x="817.0" y="341.2" width="6.9" height="2.8"/>
+<rect class="f1" fill="#2a78d6" x="825.0" y="265.0" width="6.9" height="79.0"/>
+<text class="muted" fill="#52514e" x="825.0" y="360" text-anchor="middle" font-size="10">S</text>
+<text class="muted" fill="#52514e" x="816.9" y="378" font-size="10">1</text>
+<line class="axis" stroke="#b8b7b1" x1="813.9" x2="813.9" y1="344" y2="368"/>
+<line class="axis" stroke="#b8b7b1" x1="64" x2="836" y1="344" y2="344"/>
+</svg>

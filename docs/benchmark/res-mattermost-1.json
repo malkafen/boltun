@@ -1,0 +1,382 @@
+{
+ "app": "mattermost",
+ "steps": [
+  {
+   "name": "launch",
+   "start": 1792878335.212398,
+   "end": 1792878337.181,
+   "posts": 1969,
+   "connected": 1812
+  },
+  {
+   "name": "idle",
+   "start": 1792878337.328924,
+   "end": 1792878397.339234,
+   "mb": 757,
+   "processes": 12,
+   "threads": 216
+  },
+  {
+   "name": "switches",
+   "start": 1792878397.341969,
+   "end": 1792878457.50846,
+   "switches": [
+    {
+     "kind": "channel",
+     "server": 0,
+     "team": "ad-1",
+     "channel": "sint-9",
+     "ms": 148.2,
+     "freeze": 89,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 0,
+     "team": "ad-1",
+     "channel": "culpa-5",
+     "ms": 104.3,
+     "freeze": 75,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 0,
+     "team": "ad-1",
+     "channel": "g3td8kx76tnw7bumbf57h5c6hw__tikkmcpwfingtrt5x785wcchbo",
+     "ms": 118.8,
+     "freeze": 70,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 0,
+     "team": "ad-1",
+     "channel": "quod-7",
+     "ms": 123.9,
+     "freeze": 63,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 0,
+     "team": "ad-1",
+     "channel": "boltun-kit-live",
+     "ms": 80.2,
+     "freeze": 32,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 0,
+     "team": "ad-1",
+     "channel": "town-square",
+     "ms": 66.8,
+     "freeze": 37,
+     "retries": 0
+    },
+    {
+     "kind": "team",
+     "server": 0,
+     "team": "reiciendis-0",
+     "channel": "town-square",
+     "ms": 139.9,
+     "freeze": 72,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 0,
+     "team": "reiciendis-0",
+     "channel": "et-0",
+     "ms": 135.7,
+     "freeze": 69,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 0,
+     "team": "reiciendis-0",
+     "channel": "qui-4",
+     "ms": 110.1,
+     "freeze": 64,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 0,
+     "team": "reiciendis-0",
+     "channel": "rem-3",
+     "ms": 140.2,
+     "freeze": 73,
+     "retries": 0
+    },
+    {
+     "kind": "team",
+     "server": 0,
+     "team": "amet-2",
+     "channel": "town-square",
+     "ms": 122.6,
+     "freeze": 49,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 0,
+     "team": "amet-2",
+     "channel": "adipisci-7",
+     "ms": 105.6,
+     "freeze": 57,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 0,
+     "team": "amet-2",
+     "channel": "magni-8",
+     "ms": 95.5,
+     "freeze": 45,
+     "retries": 0
+    },
+    {
+     "kind": "server",
+     "server": 1,
+     "team": "nisi-1",
+     "channel": "town-square",
+     "ms": 121.4,
+     "freeze": 72,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 1,
+     "team": "nisi-1",
+     "channel": "porro-7",
+     "ms": 136.2,
+     "freeze": 67,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 1,
+     "team": "nisi-1",
+     "channel": "minima-6",
+     "ms": 125,
+     "freeze": 76,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 1,
+     "team": "nisi-1",
+     "channel": "7f89rbk73381d8u4zh7ke3s8oa__bocdx3am8tnexex3b778aboddw",
+     "ms": 123.7,
+     "freeze": 59,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 1,
+     "team": "nisi-1",
+     "channel": "explicabo-3",
+     "ms": 93.4,
+     "freeze": 67,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 1,
+     "team": "nisi-1",
+     "channel": "town-square",
+     "ms": 72.8,
+     "freeze": 35,
+     "retries": 0
+    },
+    {
+     "kind": "team",
+     "server": 1,
+     "team": "tenetur-0",
+     "channel": "town-square",
+     "ms": 150.4,
+     "freeze": 70,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 1,
+     "team": "tenetur-0",
+     "channel": "aperiam-1",
+     "ms": 138.2,
+     "freeze": 73,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 1,
+     "team": "tenetur-0",
+     "channel": "eos-6",
+     "ms": 94.2,
+     "freeze": 44,
+     "retries": 0
+    },
+    {
+     "kind": "server",
+     "server": 2,
+     "team": "alpha",
+     "channel": "town-square",
+     "ms": 120.5,
+     "freeze": 69,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 2,
+     "team": "alpha",
+     "channel": "off-topic",
+     "ms": 118.2,
+     "freeze": 87,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 2,
+     "team": "alpha",
+     "channel": "boltun-read-info-live",
+     "ms": 124.8,
+     "freeze": 80,
+     "retries": 0
+    },
+    {
+     "kind": "team",
+     "server": 2,
+     "team": "beta",
+     "channel": "town-square",
+     "ms": 142.7,
+     "freeze": 59,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 2,
+     "team": "beta",
+     "channel": "off-topic",
+     "ms": 105.2,
+     "freeze": 53,
+     "retries": 0
+    },
+    {
+     "kind": "server",
+     "server": 0,
+     "team": "amet-2",
+     "channel": "magni-8",
+     "ms": 4.1,
+     "freeze": 27,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 0,
+     "team": "amet-2",
+     "channel": "a-3",
+     "ms": 132.5,
+     "freeze": 71,
+     "retries": 0
+    },
+    {
+     "kind": "team",
+     "server": 0,
+     "team": "ad-1",
+     "channel": "town-square",
+     "ms": 101.8,
+     "freeze": 55,
+     "retries": 0
+    },
+    {
+     "kind": "channel",
+     "server": 0,
+     "team": "ad-1",
+     "channel": "sint-9",
+     "ms": 72.5,
+     "freeze": 50,
+     "retries": 0
+    },
+    {
+     "kind": "server",
+     "server": 1,
+     "team": "tenetur-0",
+     "channel": "eos-6",
+     "ms": 4.4,
+     "freeze": 28,
+     "retries": 0
+    },
+    {
+     "kind": "team",
+     "server": 1,
+     "team": "nisi-1",
+     "channel": "town-square",
+     "ms": 106.6,
+     "freeze": 56,
+     "retries": 0
+    },
+    {
+     "kind": "server",
+     "server": 2,
+     "team": "beta",
+     "channel": "off-topic",
+     "ms": 4.5,
+     "freeze": 28,
+     "retries": 0
+    },
+    {
+     "kind": "server",
+     "server": 0,
+     "team": "ad-1",
+     "channel": "sint-9",
+     "ms": 3.2,
+     "freeze": 26,
+     "retries": 0
+    }
+   ],
+   "mb": 1057,
+   "processes": 12,
+   "threads": 227
+  },
+  {
+   "name": "history_open",
+   "start": 1792878457.991333,
+   "end": 1792878459.686359,
+   "ms": 94.9,
+   "freeze": 70
+  },
+  {
+   "name": "history",
+   "start": 1792878459.686362,
+   "end": 1792878465.885706,
+   "ms": 4684.9,
+   "posts": 1002,
+   "scrolls": 33,
+   "mb": 1444,
+   "processes": 12,
+   "threads": 224
+  },
+  {
+   "name": "traffic",
+   "start": 1792878471.363997,
+   "end": 1792878655.462624,
+   "freeze": 56,
+   "long_tasks": 3,
+   "long_tasks_hidden": 12,
+   "mb": 974,
+   "processes": 13,
+   "threads": 241
+  },
+  {
+   "name": "end",
+   "start": 1792878655.4678211,
+   "end": 1792878775.488157,
+   "mb": 938,
+   "processes": 13,
+   "threads": 234
+  }
+ ]
+}
