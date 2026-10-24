@@ -43,46 +43,60 @@ public enum SidebarBuilder {
         members: [String: ChannelMember],
         hiddenDirect: Set<String>,
         displayName: (Channel) -> String,
-        currentChannelId: String?
+        currentChannelId: String?,
+        directMessageLimit limit: Int? = SidebarBuilder.directMessageLimit
     ) -> [SidebarSection] {
+        func visible(_ id: String) -> Bool {
+            guard let channel = channels[id] else { return false }
+            if id == currentChannelId { return true }
+            return members[id] != nil && !channel.isArchived && !hiddenDirect.contains(id)
+        }
+        let categorized = Set(categories.flatMap(\.channelIds))
+        var candidates = Set(members.keys)
+        if let currentChannelId { candidates.insert(currentChannelId) }
+        let orphans = candidates.filter { !categorized.contains($0) && visible($0) }.sorted()
+        let directOrphans = orphans.filter { channels[$0]?.type.isDirectOrGroup == true }
+        let regularOrphans = orphans.filter { channels[$0]?.type.isDirectOrGroup == false }
+
+        var lists = categories
+        appendOrphans(regularOrphans, type: .channels, id: "channels", title: "Channels", to: &lists)
+        appendOrphans(directOrphans, type: .directMessages, id: "direct_messages", title: "Direct Messages", to: &lists)
+
         var claimed = Set<String>()
         var result: [SidebarSection] = []
-        for category in categories {
+        for category in lists {
+            var seen = Set<String>()
             var ids = category.channelIds.filter { id in
-                guard let channel = channels[id], members[id] != nil || id == currentChannelId else { return false }
-                if channel.isArchived && id != currentChannelId { return false }
-                if hiddenDirect.contains(id) && id != currentChannelId { return false }
-                return !claimed.contains(id)
+                guard visible(id), !claimed.contains(id) else { return false }
+                return seen.insert(id).inserted
             }
             ids = sort(ids, category: category, channels: channels, displayName: displayName)
-            if category.type == .directMessages && ids.count > directMessageLimit {
-                let unreadIds = Set(ids.filter { id in channels[id].map { unread(channel: $0, member: members[id]).unread } ?? false })
-                var kept = Array(ids.prefix(directMessageLimit))
-                kept.append(contentsOf: ids.dropFirst(directMessageLimit).filter { unreadIds.contains($0) || $0 == currentChannelId })
-                ids = kept
+            if category.type == .directMessages, let limit, ids.count > limit {
+                let overflow = ids.dropFirst(limit).filter { id in
+                    id == currentChannelId || (channels[id].map { unread(channel: $0, member: members[id]).unread } ?? false)
+                }
+                ids = Array(ids.prefix(limit)) + overflow
             }
             claimed.formUnion(ids)
             result.append(SidebarSection(id: category.id, title: category.displayName, type: category.type, collapsed: category.collapsed, channelIds: ids))
         }
-        let orphans = members.keys.filter { id in
-            guard !claimed.contains(id), let channel = channels[id], !channel.isArchived else { return false }
-            return !hiddenDirect.contains(id)
-        }
-        if !orphans.isEmpty {
-            let direct = orphans.filter { channels[$0]?.type.isDirectOrGroup == true }
-            let regular = orphans.filter { channels[$0]?.type.isDirectOrGroup == false }
-            if let index = result.firstIndex(where: { $0.type == .channels }) {
-                result[index].channelIds = sortAlphabetical(result[index].channelIds + regular, channels: channels, displayName: displayName)
-            } else if !regular.isEmpty {
-                result.append(SidebarSection(id: "channels", title: "Channels", type: .channels, collapsed: false, channelIds: sortAlphabetical(regular, channels: channels, displayName: displayName)))
-            }
-            if let index = result.firstIndex(where: { $0.type == .directMessages }) {
-                result[index].channelIds = sortRecent(result[index].channelIds + direct, channels: channels)
-            } else if !direct.isEmpty {
-                result.append(SidebarSection(id: "direct_messages", title: "Direct Messages", type: .directMessages, collapsed: false, channelIds: sortRecent(direct, channels: channels)))
-            }
-        }
         return result
+    }
+
+    static func appendOrphans(_ orphans: [String], type: CategoryType, id: String, title: String, to lists: inout [ChannelCategory]) {
+        guard !orphans.isEmpty else { return }
+        if let index = lists.firstIndex(where: { $0.type == type }) {
+            lists[index].channelIds.append(contentsOf: orphans)
+        } else {
+            lists.append(ChannelCategory(id: id, type: type, displayName: title, channelIds: orphans))
+        }
+    }
+
+    public static func directMessageLimit(preference: String?) -> Int? {
+        guard let preference else { return directMessageLimit }
+        if preference == "all" { return nil }
+        guard let value = Int(preference), value > 0 else { return directMessageLimit }
+        return value
     }
 
     static func sort(_ ids: [String], category: ChannelCategory, channels: [String: Channel], displayName: (Channel) -> String) -> [String] {

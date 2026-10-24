@@ -65,39 +65,66 @@ public actor RealtimeClient {
     private let connector: WebSocketConnector
     private let sleeper: Sleeper
     private let maxBackoff: Duration
+    private let handshakeTimeout: Duration?
     private var connection: WebSocketConnection?
     private var loop: Task<Void, Never>?
+    private var watchdog: Task<Void, Never>?
+    private var backoffWaiter: Task<Void, Error>?
     private var seq: Int64 = 1
     private var connectionId = ""
-    private var lastServerSeq: Int64 = -1
+    private var nextServerSeq: Int64 = 0
     private var hasConnectedBefore = false
+    private var generation = 0
+    private var established = false
+    private var announced = false
+    private var stopped = false
+    private var skipBackoff = false
     private let continuation: AsyncStream<RealtimeEvent>.Continuation
     public nonisolated let events: AsyncStream<RealtimeEvent>
 
-    public init(url: URL, token: String, connector: WebSocketConnector = URLSessionWebSocketConnector(), maxBackoff: Duration = .seconds(30), sleeper: @escaping Sleeper = { try await Task.sleep(for: $0) }) {
+    public init(
+        url: URL,
+        token: String,
+        connector: WebSocketConnector = URLSessionWebSocketConnector(),
+        maxBackoff: Duration = .seconds(30),
+        handshakeTimeout: Duration? = .seconds(20),
+        sleeper: @escaping Sleeper = { try await Task.sleep(for: $0) }
+    ) {
         self.url = url
         self.token = token
         self.connector = connector
         self.sleeper = sleeper
         self.maxBackoff = maxBackoff
+        self.handshakeTimeout = handshakeTimeout
         (events, continuation) = AsyncStream.makeStream(of: RealtimeEvent.self, bufferingPolicy: .unbounded)
     }
 
     public func start() {
-        guard loop == nil else { return }
+        guard loop == nil, !stopped else { return }
         loop = Task { await self.run() }
     }
 
     public func stop() {
+        stopped = true
         loop?.cancel()
         loop = nil
+        watchdog?.cancel()
+        watchdog = nil
+        backoffWaiter?.cancel()
+        backoffWaiter = nil
         connection?.close()
         connection = nil
         continuation.finish()
     }
 
     public func reconnectNow() {
-        connection?.close()
+        guard !stopped else { return }
+        skipBackoff = true
+        if let backoffWaiter {
+            backoffWaiter.cancel()
+        } else {
+            connection?.close()
+        }
     }
 
     public func userTyping(channelId: String, parentId: String = "") async {
@@ -116,58 +143,126 @@ public actor RealtimeClient {
         guard !connectionId.isEmpty, var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
         components.queryItems = [
             URLQueryItem(name: "connection_id", value: connectionId),
-            URLQueryItem(name: "sequence_number", value: String(lastServerSeq)),
+            URLQueryItem(name: "sequence_number", value: String(nextServerSeq)),
         ]
         return components.url ?? url
     }
 
     private func run() async {
         var attempt = 0
-        while !Task.isCancelled {
+        while !Task.isCancelled && !stopped {
             let connection = connector.connect(url: connectionURL(), token: token)
+            generation += 1
             self.connection = connection
             seq = 1
-            var receivedAny = false
+            established = false
+            announced = false
+            armWatchdog(generation: generation)
+            await sendAction("ping", data: [:])
             do {
-                while !Task.isCancelled {
+                while !Task.isCancelled && !stopped {
                     let text = try await connection.receive()
-                    guard let event = WebSocketEvent.parse(text) else { continue }
-                    if !receivedAny {
-                        receivedAny = true
+                    if !established {
+                        established = true
                         attempt = 0
+                        watchdog?.cancel()
                     }
-                    handle(event)
+                    handle(text)
                 }
             } catch {
                 connection.close()
                 self.connection = nil
-                if Task.isCancelled { break }
+                watchdog?.cancel()
+                if Task.isCancelled || stopped { break }
                 continuation.yield(.disconnected(error.localizedDescription))
             }
-            if Task.isCancelled { break }
+            if Task.isCancelled || stopped { break }
+            if skipBackoff {
+                skipBackoff = false
+                attempt = 0
+                continue
+            }
             attempt += 1
-            let delay = backoff(attempt: attempt)
-            do { try await sleeper(delay) } catch { break }
+            guard await waitBeforeReconnect(backoff(attempt: attempt)) else { break }
         }
+    }
+
+    private func waitBeforeReconnect(_ delay: Duration) async -> Bool {
+        let sleeper = self.sleeper
+        let waiter = Task { try await sleeper(delay) }
+        backoffWaiter = waiter
+        let result = await waiter.result
+        backoffWaiter = nil
+        if stopped || Task.isCancelled { return false }
+        if skipBackoff {
+            skipBackoff = false
+            return true
+        }
+        if case .failure = result { return false }
+        return true
+    }
+
+    private func armWatchdog(generation current: Int) {
+        watchdog?.cancel()
+        watchdog = nil
+        guard let handshakeTimeout else { return }
+        let sleeper = self.sleeper
+        watchdog = Task { [weak self] in
+            do { try await sleeper(handshakeTimeout) } catch { return }
+            await self?.handshakeExpired(generation: current)
+        }
+    }
+
+    private func handshakeExpired(generation current: Int) {
+        guard current == generation, !established else { return }
+        connection?.close()
     }
 
     func backoff(attempt: Int) -> Duration {
-        let seconds = min(Double(1 << min(attempt - 1, 10)), Double(maxBackoff.components.seconds))
+        let seconds = min(Double(1 << min(max(attempt, 1) - 1, 10)), Double(maxBackoff.components.seconds))
         return .seconds(max(seconds, 0))
     }
 
-    private func handle(_ event: WebSocketEvent) {
-        if event.event == WebSocketEventType.hello {
-            let newId = event.string("connection_id") ?? ""
-            let resumed = !connectionId.isEmpty && newId == connectionId
-            connectionId = newId
-            lastServerSeq = event.seq
-            let reconnected = hasConnectedBefore
-            hasConnectedBefore = true
-            continuation.yield(.connected(needsResync: reconnected && !resumed))
+    private func handle(_ text: String) {
+        guard let event = WebSocketEvent.parse(text) else {
+            if !announced && !connectionId.isEmpty { announce(needsResync: false) }
             return
         }
-        lastServerSeq = event.seq
+        if event.event == WebSocketEventType.hello {
+            handleHello(event)
+            return
+        }
+        guard !connectionId.isEmpty, event.seq > 0 else {
+            if !announced && !connectionId.isEmpty { announce(needsResync: false) }
+            continuation.yield(.event(event))
+            return
+        }
+        if event.seq < nextServerSeq {
+            if !announced { announce(needsResync: false) }
+            return
+        }
+        let gap = event.seq > nextServerSeq
+        if !announced {
+            announce(needsResync: gap)
+        } else if gap {
+            continuation.yield(.connected(needsResync: true))
+        }
+        nextServerSeq = event.seq + 1
         continuation.yield(.event(event))
+    }
+
+    private func handleHello(_ event: WebSocketEvent) {
+        let newId = event.string("connection_id") ?? ""
+        let resumed = !connectionId.isEmpty && newId == connectionId
+        let needsResync = hasConnectedBefore && !resumed
+        connectionId = newId
+        nextServerSeq = event.seq + 1
+        announce(needsResync: needsResync)
+    }
+
+    private func announce(needsResync: Bool) {
+        announced = true
+        hasConnectedBefore = true
+        continuation.yield(.connected(needsResync: needsResync))
     }
 }

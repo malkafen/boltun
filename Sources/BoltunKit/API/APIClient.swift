@@ -37,9 +37,22 @@ public struct APIClient: Sendable {
     public func url(_ path: String, query: [String: String] = [:]) -> URL {
         var components = URLComponents(url: apiBase.appending(path: path), resolvingAgainstBaseURL: false)!
         if !query.isEmpty {
-            components.queryItems = query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
+            components.percentEncodedQuery = query
+                .sorted { $0.key < $1.key }
+                .map { "\(Self.encodeQueryComponent($0.key))=\(Self.encodeQueryComponent($0.value))" }
+                .joined(separator: "&")
         }
         return components.url!
+    }
+
+    static let queryAllowed: CharacterSet = {
+        var set = CharacterSet.alphanumerics.intersection(CharacterSet(charactersIn: Unicode.Scalar(0)..<Unicode.Scalar(128)))
+        set.insert(charactersIn: "-._~")
+        return set
+    }()
+
+    static func encodeQueryComponent(_ value: String) -> String {
+        value.addingPercentEncoding(withAllowedCharacters: queryAllowed) ?? value
     }
 
     public func request(_ method: HTTPMethod, _ path: String, query: [String: String] = [:], body: Data? = nil, contentType: String = "application/json") -> URLRequest {
@@ -62,6 +75,7 @@ public struct APIClient: Sendable {
         do {
             (data, response) = try await transport.send(request)
         } catch {
+            if APIError.isCancellation(error) { throw CancellationError() }
             throw APIError.wrap(error)
         }
         guard (200..<300).contains(response.statusCode) else {

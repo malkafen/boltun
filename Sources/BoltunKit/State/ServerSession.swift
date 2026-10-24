@@ -10,6 +10,13 @@ public enum ConnectionState: Equatable, Sendable {
     case failed(String)
 }
 
+extension Duration {
+    var seconds: TimeInterval {
+        let parts = components
+        return TimeInterval(parts.seconds) + TimeInterval(parts.attoseconds) / 1e18
+    }
+}
+
 public struct ChannelTimeline: Equatable, Sendable {
     public var postIds: [String] = []
     public var hasMoreOlder = true
@@ -54,12 +61,14 @@ public final class ServerSession {
     public internal(set) var typing: [String: [String: Date]] = [:]
     public internal(set) var customEmojis: [String: CustomEmoji] = [:]
     public internal(set) var lastError: String?
+    public internal(set) var pendingPostIds: Set<String> = []
 
     @ObservationIgnored public var onNotification: ((MentionNotification) -> Void)?
     @ObservationIgnored public var onUnauthorized: (() -> Void)?
     @ObservationIgnored public var onSelectionChange: ((String?, String?) -> Void)?
     @ObservationIgnored public var isAppActive: () -> Bool = { true }
     @ObservationIgnored public var now: () -> Date = Date.init
+    @ObservationIgnored public var typingTimeout: Duration = .seconds(6)
     @ObservationIgnored let realtimeFactory: (URL, String) -> RealtimeClient
     @ObservationIgnored var realtime: RealtimeClient?
     @ObservationIgnored var realtimeTask: Task<Void, Never>?
@@ -67,6 +76,9 @@ public final class ServerSession {
     @ObservationIgnored var requestedUserIds = Set<String>()
     @ObservationIgnored var lastTypingSent: [String: Date] = [:]
     @ObservationIgnored var loadedTeams = Set<String>()
+    @ObservationIgnored var lastPendingMillis: Int64 = 0
+    @ObservationIgnored var deletedPostIds = Set<String>()
+    @ObservationIgnored var manuallyUnread = Set<String>()
     @ObservationIgnored let pageSize: Int
 
     public init(
@@ -84,7 +96,7 @@ public final class ServerSession {
     public var myId: String { me?.id ?? "" }
 
     public var nameDisplay: NameDisplaySetting {
-        let value = preferences.first { $0.category == PreferenceCategory.displaySettings && $0.name == "name_format" }?.value
+        let value = preferences.first { $0.category == PreferenceCategory.displaySettings && $0.name == PreferenceName.nameFormat }?.value
         return NameDisplaySetting(preference: value ?? config.teammateNameDisplay)
     }
 
@@ -175,9 +187,16 @@ public final class ServerSession {
             members: teamMembers,
             hiddenDirect: hiddenDirectChannelIds,
             displayName: { [unowned self] in self.displayName(channel: $0) },
-            currentChannelId: currentChannelId
+            currentChannelId: currentChannelId,
+            directMessageLimit: SidebarBuilder.directMessageLimit(preference: preferenceValue(category: PreferenceCategory.sidebarSettings, name: PreferenceName.limitVisibleDirectMessages))
         )
     }
+
+    public func preferenceValue(category: String, name: String) -> String? {
+        preferences.last { $0.category == category && $0.name == name }?.value
+    }
+
+    public func isPending(postId: String) -> Bool { pendingPostIds.contains(postId) }
 
     public func timelinePosts(channelId: String) -> [Post] {
         (timelines[channelId]?.postIds ?? []).compactMap { posts[$0] }
@@ -188,7 +207,7 @@ public final class ServerSession {
     }
 
     public func typingUsers(channelId: String, parentId: String = "") -> [String] {
-        let cutoff = now().addingTimeInterval(-6)
+        let cutoff = now().addingTimeInterval(-typingTimeout.seconds)
         let key = typingKey(channelId: channelId, parentId: parentId)
         return (typing[key] ?? [:]).filter { $0.value > cutoff && $0.key != myId }.keys.sorted().map { displayName(userId: $0) }
     }
@@ -208,30 +227,76 @@ public final class ServerSession {
             onUnauthorized?()
             return
         }
+        switch connection {
+        case .connecting, .connected, .reconnecting: return
+        default: break
+        }
         connection = .connecting
         do {
             try await loadInitial()
+            guard connection == .connecting else { return }
             connection = .connected
             startRealtime(token: token)
-        } catch let error as APIError where error.isUnauthorized {
-            connection = .unauthorized
-            onUnauthorized?()
         } catch {
-            connection = .failed(APIError.wrap(error).localizedDescription)
-            lastError = APIError.wrap(error).localizedDescription
+            guard connection == .connecting else { return }
+            if APIError.isCancellation(error) {
+                connection = .idle
+                return
+            }
+            let apiError = APIError.wrap(error)
+            if apiError.isUnauthorized {
+                handleUnauthorized()
+            } else {
+                connection = .failed(apiError.localizedDescription)
+                lastError = apiError.localizedDescription
+            }
         }
     }
 
     public func stop() {
+        stopRealtime()
+        connection = .idle
+    }
+
+    func stopRealtime() {
         realtimeTask?.cancel()
         realtimeTask = nil
         if let realtime { Task { await realtime.stop() } }
         realtime = nil
-        connection = .idle
     }
 
     public func updateToken(_ token: String?) {
         client.token = token
+    }
+
+    func report(_ error: Error, silently: Bool = false) {
+        if APIError.isCancellation(error) { return }
+        let apiError = APIError.wrap(error)
+        if apiError.isUnauthorized {
+            handleUnauthorized()
+        } else if !silently {
+            lastError = apiError.localizedDescription
+        }
+    }
+
+    func handleUnauthorized() {
+        guard connection != .unauthorized else { return }
+        connection = .unauthorized
+        stopRealtime()
+        onUnauthorized?()
+    }
+
+    func quietly<T>(_ operation: () async throws -> T) async -> T? {
+        do {
+            return try await operation()
+        } catch {
+            report(error, silently: true)
+            return nil
+        }
+    }
+
+    static func sortedTeams(_ list: [Team]) -> [Team] {
+        list.filter { $0.deleteAt == 0 }.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
 
     func loadInitial() async throws {
@@ -244,15 +309,20 @@ public final class ServerSession {
         me = user
         users[user.id] = user
         config = clientConfig
-        teams = myTeams.filter { $0.deleteAt == 0 }.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+        teams = Self.sortedTeams(myTeams)
         teamUnreads = Dictionary(unreads.map { ($0.teamId, $0) }, uniquingKeysWith: { a, _ in a })
         preferences = prefs
         loadedTeams.removeAll()
-        if let teamId = currentTeamId, teams.contains(where: { $0.id == teamId }) {
-            try await loadTeam(teamId)
+        if let teamId = currentTeamId {
+            if teams.contains(where: { $0.id == teamId }) {
+                try await loadTeam(teamId)
+            } else {
+                currentTeamId = nil
+                currentChannelId = nil
+                if let first = teams.first { await selectTeam(first.id) }
+            }
         }
-        if let channelId = currentChannelId, timelines[channelId]?.loaded == true {
-            timelines[channelId] = nil
+        if let channelId = currentChannelId, timelines[channelId] != nil {
             await loadLatest(channelId: channelId)
         }
         Task { await self.loadCustomEmojis() }
@@ -262,15 +332,20 @@ public final class ServerSession {
         guard teams.contains(where: { $0.id == teamId }) else { return }
         let previous = currentChannelId
         currentTeamId = teamId
-        do {
-            if !loadedTeams.contains(teamId) { try await loadTeam(teamId) }
-        } catch {
-            lastError = APIError.wrap(error).localizedDescription
-            return
+        if !loadedTeams.contains(teamId) {
+            do {
+                try await loadTeam(teamId)
+            } catch {
+                report(error)
+                return
+            }
         }
         guard currentTeamId == teamId else { return }
-        let target = channelId.flatMap { channels[$0] != nil ? $0 : nil } ?? defaultChannel(teamId: teamId)
-        if let target {
+        let requested = channelId.flatMap { id -> String? in
+            guard let channel = channels[id], channel.teamId.isEmpty || channel.teamId == teamId else { return nil }
+            return id
+        }
+        if let target = requested ?? defaultChannel(teamId: teamId) {
             await selectChannel(target, previous: previous)
         } else {
             currentChannelId = nil
@@ -290,6 +365,10 @@ public final class ServerSession {
         async let membersRequest = client.myChannelMembers(teamId: teamId)
         async let categoriesRequest = client.myCategories(teamId: teamId)
         let (teamChannels, teamMembers, teamCategories) = try await (channelsRequest, membersRequest, categoriesRequest)
+        let returned = Set(teamChannels.map(\.id))
+        for (id, channel) in channels where !returned.contains(id) && (channel.teamId == teamId || channel.type.isDirectOrGroup) {
+            members[id] = nil
+        }
         for channel in teamChannels { channels[channel.id] = channel }
         for member in teamMembers { members[member.channelId] = member }
         categories[teamId] = teamCategories.sorted
@@ -298,8 +377,10 @@ public final class ServerSession {
         for channel in teamChannels where channel.type == .direct {
             if let partner = channel.directPartnerId(me: myId) { needed.insert(partner) }
         }
-        await ensureUsers(Array(needed))
-        await refreshStatuses(Array(needed))
+        let ids = Array(needed)
+        async let usersLoaded: Void = ensureUsers(ids)
+        async let statusesLoaded: Void = refreshStatuses(ids)
+        _ = await (usersLoaded, statusesLoaded)
     }
 
     public func selectChannel(_ channelId: String, previous: String? = nil) async {
@@ -308,30 +389,57 @@ public final class ServerSession {
             currentTeamId = channel.teamId
         }
         currentChannelId = channelId
+        manuallyUnread.remove(channelId)
         onSelectionChange?(currentTeamId, channelId)
         var timeline = timelines[channelId] ?? ChannelTimeline()
         timeline.lastViewedAtOnOpen = members[channelId]?.lastViewedAt ?? 0
         timelines[channelId] = timeline
+        if let teamId = currentTeamId, !loadedTeams.contains(teamId), teams.contains(where: { $0.id == teamId }) {
+            do {
+                try await loadTeam(teamId)
+            } catch {
+                report(error, silently: true)
+            }
+        }
         if timeline.loaded {
             await loadNewer(channelId: channelId)
         } else {
             await loadLatest(channelId: channelId)
         }
-        await markViewed(channelId: channelId, previous: previousId ?? "")
+        guard currentChannelId == channelId else { return }
+        let previousChannel = previousId == channelId ? "" : (previousId ?? "")
+        await markViewed(channelId: channelId, previous: previousChannel)
     }
 
     public func markViewed(channelId: String, previous: String = "") async {
-        guard let channel = channels[channelId] else { return }
-        if var member = members[channelId] {
-            member.msgCount = channel.totalMsgCount
-            member.msgCountRoot = channel.totalMsgCountRoot
-            member.mentionCount = 0
-            member.mentionCountRoot = 0
-            member.urgentMentionCount = 0
-            member.lastViewedAt = max(member.lastViewedAt, channel.lastPostAt)
-            members[channelId] = member
+        guard channels[channelId] != nil else { return }
+        manuallyUnread.remove(channelId)
+        markLocallyViewed(channelId)
+        do {
+            try await client.viewChannel(channelId: channelId, previousChannelId: previous)
+        } catch {
+            report(error, silently: true)
         }
-        try? await client.viewChannel(channelId: channelId, previousChannelId: previous)
+    }
+
+    public func markUnread(postId: String) async {
+        guard let post = posts[postId], !myId.isEmpty, !pendingPostIds.contains(postId) else { return }
+        do {
+            let unread = try await client.markPostUnread(userId: myId, postId: postId)
+            manuallyUnread.insert(post.channelId)
+            if var member = members[post.channelId] {
+                member.msgCount = unread.msgCount
+                member.msgCountRoot = unread.msgCountRoot
+                member.mentionCount = unread.mentionCount
+                member.mentionCountRoot = unread.mentionCountRoot
+                member.urgentMentionCount = unread.urgentMentionCount
+                member.lastViewedAt = unread.lastViewedAt
+                members[post.channelId] = member
+            }
+            timelines[post.channelId]?.lastViewedAtOnOpen = unread.lastViewedAt
+        } catch {
+            report(error)
+        }
     }
 
     func loadLatest(channelId: String) async {
@@ -339,57 +447,98 @@ public final class ServerSession {
         guard !timeline.isLoading else { return }
         timeline.isLoading = true
         timelines[channelId] = timeline
+        let result: Result<PostList, Error>
         do {
-            let list = try await client.posts(channelId: channelId, page: .latest(perPage: pageSize))
-            ingest(list)
-            timeline = timelines[channelId] ?? ChannelTimeline()
-            let fetched = list.order.reversed().filter { posts[$0] != nil }
-            let existing = timeline.postIds.filter { id in !fetched.contains(id) && (posts[id]?.createAt ?? 0) > (list.posts[fetched.last ?? ""]?.createAt ?? Int64.max) }
-            timeline.postIds = fetched + existing
-            timeline.hasMoreOlder = list.order.count >= pageSize
-            timeline.loaded = true
+            result = .success(try await client.posts(channelId: channelId, page: .latest(perPage: pageSize)))
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            result = .failure(error)
         }
-        timeline.isLoading = false
-        timelines[channelId] = timeline
+        guard var current = timelines[channelId] else { return }
+        current.isLoading = false
+        switch result {
+        case .success(let list):
+            ingest(list)
+            let fetched = list.order.reversed().filter { posts[$0] != nil }
+            let fetchedIds = Set(fetched)
+            let newestFetched = fetched.last.flatMap { posts[$0]?.createAt } ?? Int64.min
+            let newer = current.postIds.filter { id in
+                guard !fetchedIds.contains(id), let post = posts[id] else { return false }
+                return post.createAt > newestFetched
+            }
+            current.postIds = fetched + newer
+            current.hasMoreOlder = list.order.count >= pageSize
+            current.loaded = true
+        case .failure(let error):
+            report(error)
+        }
+        timelines[channelId] = current
     }
 
     public func loadOlder(channelId: String) async {
         guard var timeline = timelines[channelId], timeline.loaded, timeline.hasMoreOlder, !timeline.isLoading,
-              let oldest = timeline.postIds.first
+              let oldest = timeline.postIds.first(where: { !pendingPostIds.contains($0) })
         else { return }
         timeline.isLoading = true
         timelines[channelId] = timeline
+        let result: Result<PostList, Error>
         do {
-            let list = try await client.posts(channelId: channelId, page: .before(postId: oldest, perPage: pageSize))
-            ingest(list)
-            timeline = timelines[channelId] ?? timeline
-            let existing = Set(timeline.postIds)
-            let older = list.order.reversed().filter { !existing.contains($0) && posts[$0] != nil }
-            timeline.postIds.insert(contentsOf: older, at: 0)
-            timeline.hasMoreOlder = list.order.count >= pageSize
+            result = .success(try await client.posts(channelId: channelId, page: .before(postId: oldest, perPage: pageSize)))
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            result = .failure(error)
         }
-        timeline.isLoading = false
-        timelines[channelId] = timeline
+        guard var current = timelines[channelId] else { return }
+        current.isLoading = false
+        switch result {
+        case .success(let list):
+            ingest(list)
+            let existing = Set(current.postIds)
+            let older = list.order.reversed().filter { !existing.contains($0) && posts[$0] != nil }
+            current.postIds.insert(contentsOf: older, at: 0)
+            current.hasMoreOlder = list.order.count >= pageSize
+        case .failure(let error):
+            report(error)
+        }
+        timelines[channelId] = current
+    }
+
+    func syncedAt(channelId: String) -> Int64? {
+        timelines[channelId]?.postIds
+            .filter { !pendingPostIds.contains($0) }
+            .compactMap { posts[$0] }
+            .map { max($0.createAt, $0.updateAt, $0.editAt, $0.deleteAt) }
+            .max()
     }
 
     func loadNewer(channelId: String) async {
-        guard let timeline = timelines[channelId], let newest = timeline.postIds.last.flatMap({ posts[$0] }) else {
+        guard var timeline = timelines[channelId], timeline.loaded, let since = syncedAt(channelId: channelId), since > 0 else {
             await loadLatest(channelId: channelId)
             return
         }
+        guard !timeline.isLoading else { return }
+        timeline.isLoading = true
+        timelines[channelId] = timeline
+        let result: Result<PostList, Error>
         do {
-            let list = try await client.posts(channelId: channelId, page: .since(newest.updateAt > 0 ? newest.updateAt : newest.createAt))
-            ingest(list)
-            for post in list.orderedPosts.sorted(by: { $0.createAt < $1.createAt }) {
-                insertIntoTimeline(post)
-            }
+            result = .success(try await client.posts(channelId: channelId, page: .since(since)))
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            result = .failure(error)
         }
+        guard timelines[channelId] != nil else { return }
+        timelines[channelId]?.isLoading = false
+        switch result {
+        case .success(let list):
+            applyChanges(list)
+        case .failure(let error):
+            report(error)
+        }
+    }
+
+    func applyChanges(_ list: PostList) {
+        let changed = list.posts.values.sorted { $0.createAt == $1.createAt ? $0.id < $1.id : $0.createAt < $1.createAt }
+        for post in changed where post.isDeleted { removePost(post.id, fallback: post) }
+        let live = changed.filter { !$0.isDeleted }
+        ingest(PostList(posts: Dictionary(live.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })))
+        for post in live { insertIntoTimeline(post) }
     }
 
     public func openThread(rootId: String) async {
@@ -399,30 +548,80 @@ public final class ServerSession {
         do {
             let list = try await client.postThread(postId: rootId)
             ingest(list)
-            state.postIds = list.posts.values.sorted { $0.createAt < $1.createAt }.map(\.id)
+            guard var current = threads[rootId] else { return }
+            let fetched = list.posts.values.filter { $0.id == rootId || $0.rootId == rootId }.map(\.id)
+            let ids = Set(fetched).union(current.postIds)
+            current.postIds = ids.compactMap { posts[$0] }
+                .sorted { $0.createAt == $1.createAt ? $0.id < $1.id : $0.createAt < $1.createAt }
+                .map(\.id)
+            current.isLoading = false
+            threads[rootId] = current
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            threads[rootId]?.isLoading = false
+            report(error)
         }
-        state.isLoading = false
-        threads[rootId] = state
     }
 
     public func closeThread(rootId: String) {
         threads[rootId] = nil
     }
 
+    static func normalizedMessage(_ message: String) -> String {
+        var text = Substring(message)
+        while let last = text.last, last.isWhitespace { text.removeLast() }
+        while let first = text.first, first.isNewline { text.removeFirst() }
+        return String(text)
+    }
+
+    func nextPendingPostId() -> (id: String, millis: Int64) {
+        let millis = max(now().mattermostMillis, lastPendingMillis + 1)
+        lastPendingMillis = millis
+        return ("\(myId):\(millis)", millis)
+    }
+
     @discardableResult
     public func send(_ message: String, channelId: String, rootId: String = "", fileIds: [String] = []) async -> Bool {
-        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty || !fileIds.isEmpty else { return false }
-        let pendingId = "\(myId):\(now().mattermostMillis)"
+        let text = Self.normalizedMessage(message)
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !fileIds.isEmpty else { return false }
+        let pending = nextPendingPostId()
+        addPending(Post(
+            id: pending.id,
+            createAt: pending.millis,
+            updateAt: pending.millis,
+            userId: myId,
+            channelId: channelId,
+            rootId: rootId,
+            message: text,
+            fileIds: fileIds,
+            pendingPostId: pending.id
+        ))
         do {
-            let post = try await client.createPost(channelId: channelId, message: trimmed, rootId: rootId, fileIds: fileIds, pendingPostId: pendingId)
+            let post = try await client.createPost(channelId: channelId, message: text, rootId: rootId, fileIds: fileIds, pendingPostId: pending.id)
+            discardPending(pending.id)
             receive(post: post)
             return true
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            discardPending(pending.id)
+            report(error)
             return false
+        }
+    }
+
+    func addPending(_ post: Post) {
+        pendingPostIds.insert(post.id)
+        posts[post.id] = post
+        insertIntoTimeline(post)
+        if !post.rootId.isEmpty, var thread = threads[post.rootId] {
+            thread.postIds.append(post.id)
+            threads[post.rootId] = thread
+        }
+    }
+
+    func discardPending(_ pendingId: String) {
+        guard pendingPostIds.remove(pendingId) != nil, let pending = posts.removeValue(forKey: pendingId) else { return }
+        timelines[pending.channelId]?.postIds.removeAll { $0 == pendingId }
+        if !pending.rootId.isEmpty {
+            threads[pending.rootId]?.postIds.removeAll { $0 == pendingId }
         }
     }
 
@@ -432,7 +631,7 @@ public final class ServerSession {
             receive(post: try await client.patchPost(id: postId, message: message))
             return true
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            report(error)
             return false
         }
     }
@@ -442,12 +641,12 @@ public final class ServerSession {
             try await client.deletePost(id: postId)
             removePost(postId)
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            report(error)
         }
     }
 
     public func toggleReaction(postId: String, emojiName: String) async {
-        guard let post = posts[postId] else { return }
+        guard let post = posts[postId], !pendingPostIds.contains(postId) else { return }
         let mine = post.metadata.reactions.contains { $0.userId == myId && $0.emojiName == emojiName }
         do {
             if mine {
@@ -458,7 +657,7 @@ public final class ServerSession {
                 applyReaction(reaction, added: true)
             }
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            report(error)
         }
     }
 
@@ -467,7 +666,7 @@ public final class ServerSession {
             try await client.pinPost(id: postId, pinned: pinned)
             posts[postId]?.isPinned = pinned
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            report(error)
         }
     }
 
@@ -475,7 +674,7 @@ public final class ServerSession {
         do {
             return try await client.uploadFile(channelId: channelId, filename: filename, data: data, mimeType: mimeType)
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            report(error)
             return nil
         }
     }
@@ -484,30 +683,26 @@ public final class ServerSession {
         guard let teamId = currentTeamId, !terms.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
         do {
             let results = try await client.searchPosts(teamId: teamId, terms: terms)
-            for post in results.posts.values { posts[post.id] = posts[post.id] ?? post }
+            for post in results.posts.values where posts[post.id] == nil { posts[post.id] = post }
             let found = results.orderedPosts
             await ensureUsers(found.map(\.userId))
             await ensureChannels(found.map(\.channelId))
             return found
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            report(error)
             return []
         }
     }
 
     public func autocompleteUsers(_ prefix: String, channelId: String?) async -> [User] {
-        do {
-            let found = try await client.autocompleteUsers(name: prefix, teamId: currentTeamId, channelId: channelId)
-            for user in found { users[user.id] = user }
-            return found
-        } catch {
-            return []
-        }
+        guard let found = await quietly({ try await client.autocompleteUsers(name: prefix, teamId: currentTeamId, channelId: channelId) }) else { return [] }
+        for user in found { users[user.id] = user }
+        return found
     }
 
     public func autocompleteChannels(_ prefix: String) async -> [Channel] {
         guard let teamId = currentTeamId else { return [] }
-        return (try? await client.autocompleteChannels(teamId: teamId, name: prefix)) ?? []
+        return await quietly { try await client.autocompleteChannels(teamId: teamId, name: prefix) } ?? []
     }
 
     public func browsePublicChannels() async -> [Channel] {
@@ -515,7 +710,7 @@ public final class ServerSession {
         do {
             return try await client.publicChannels(teamId: teamId).filter { !$0.isArchived }
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            report(error)
             return []
         }
     }
@@ -525,10 +720,10 @@ public final class ServerSession {
             let member = try await client.joinChannel(channelId: channel.id, userId: myId)
             channels[channel.id] = channel
             members[channel.id] = member
-            if let teamId = currentTeamId { try? await refreshCategories(teamId: teamId) }
+            if let teamId = currentTeamId { _ = await quietly { try await refreshCategories(teamId: teamId) } }
             await selectChannel(channel.id)
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            report(error)
         }
     }
 
@@ -537,7 +732,7 @@ public final class ServerSession {
             try await client.leaveChannel(channelId: channelId, userId: myId)
             removeChannelMembership(channelId)
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            report(error)
         }
     }
 
@@ -546,7 +741,7 @@ public final class ServerSession {
             let channel = try await client.createDirectChannel(userIds: [myId, userId])
             channels[channel.id] = channel
             if members[channel.id] == nil {
-                members[channel.id] = (try? await client.channelMember(channelId: channel.id)) ?? ChannelMember(channelId: channel.id, userId: myId)
+                members[channel.id] = await quietly { try await client.channelMember(channelId: channel.id) } ?? ChannelMember(channelId: channel.id, userId: myId)
             }
             await ensureUsers([userId])
             if preferences.contains(where: { $0.category == PreferenceCategory.directChannelShow && $0.name == userId && $0.value == "false" }) {
@@ -554,7 +749,7 @@ public final class ServerSession {
             }
             await selectChannel(channel.id)
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            report(error)
         }
     }
 
@@ -582,9 +777,11 @@ public final class ServerSession {
             }
         }
         categories[teamId] = list
-        for category in changed {
-            _ = try? await client.updateCategory(category)
+        var failed = false
+        for category in changed where await quietly({ try await client.updateCategory(category) }) == nil {
+            failed = true
         }
+        if failed { _ = await quietly { try await refreshCategories(teamId: teamId) } }
     }
 
     public func setCategoryCollapsed(_ categoryId: String, collapsed: Bool) async {
@@ -593,13 +790,14 @@ public final class ServerSession {
         else { return }
         list[index].collapsed = collapsed
         categories[teamId] = list
-        _ = try? await client.updateCategory(list[index])
+        let category = list[index]
+        _ = await quietly { try await client.updateCategory(category) }
     }
 
     public func savePreference(category: String, name: String, value: String) async {
         let preference = Preference(userId: myId, category: category, name: name, value: value)
         applyPreferences([preference])
-        try? await client.savePreferences(userId: myId, [preference])
+        _ = await quietly { try await client.savePreferences(userId: myId, [preference]) }
     }
 
     public func userTyping(channelId: String, parentId: String = "") {
@@ -616,7 +814,7 @@ public final class ServerSession {
             try await client.setStatus(userId: myId, status: status)
             statuses[myId] = status
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            report(error)
         }
     }
 
@@ -633,22 +831,23 @@ public final class ServerSession {
         while index < sorted.count {
             let batch = Array(sorted[index..<min(index + 100, sorted.count)])
             index += 100
-            if let found = try? await client.users(ids: batch) {
-                for user in found { users[user.id] = user }
-            } else {
+            do {
+                for user in try await client.users(ids: batch) { users[user.id] = user }
+            } catch {
                 requestedUserIds.subtract(batch)
+                report(error, silently: true)
             }
         }
     }
 
     func ensureChannels(_ ids: [String]) async {
-        for id in Set(ids) where channels[id] == nil {
-            if let channel = try? await client.channel(id: id) { channels[id] = channel }
+        for id in Set(ids) where channels[id] == nil && !id.isEmpty {
+            if let channel = await quietly({ try await client.channel(id: id) }) { channels[id] = channel }
         }
     }
 
     public func refreshStatuses(_ ids: [String]) async {
-        guard !ids.isEmpty, let found = try? await client.statuses(userIds: ids) else { return }
+        guard !ids.isEmpty, let found = await quietly({ try await client.statuses(userIds: ids) }) else { return }
         for status in found { statuses[status.userId] = status.status }
     }
 
@@ -656,44 +855,53 @@ public final class ServerSession {
         categories[teamId] = try await client.myCategories(teamId: teamId).sorted
     }
 
+    func refreshTeamUnreads() async {
+        guard let unreads = await quietly({ try await client.myTeamUnreads() }) else { return }
+        teamUnreads = Dictionary(unreads.map { ($0.teamId, $0) }, uniquingKeysWith: { a, _ in a })
+    }
+
     func loadCustomEmojis() async {
         guard config.enableCustomEmoji else { return }
         var page = 0
         while page < 20 {
-            guard let batch = try? await client.customEmojis(page: page) else { return }
+            guard let batch = await quietly({ try await client.customEmojis(page: page) }) else { return }
             for emoji in batch { customEmojis[emoji.name] = emoji }
             if batch.count < 200 { return }
             page += 1
         }
     }
 
+    func store(_ post: Post) {
+        if let existing = posts[post.id], existing.updateAt > post.updateAt { return }
+        posts[post.id] = post
+    }
+
     func ingest(_ list: PostList) {
         var userIds = Set<String>()
-        for post in list.posts.values {
-            posts[post.id] = post
+        for post in list.posts.values where !deletedPostIds.contains(post.id) {
+            store(post)
             userIds.insert(post.userId)
             for emoji in post.metadata.emojis { customEmojis[emoji.name] = emoji }
             for reaction in post.metadata.reactions { userIds.insert(reaction.userId) }
         }
-        let ids = Array(userIds)
-        Task { await self.ensureUsers(ids) }
+        let ids = userIds.filter { users[$0] == nil }
+        if !ids.isEmpty { Task { await self.ensureUsers(Array(ids)) } }
     }
 
     func insertIntoTimeline(_ post: Post) {
-        guard var timeline = timelines[post.channelId], timeline.loaded else { return }
-        guard !timeline.postIds.contains(post.id) else { return }
-        if let last = timeline.postIds.last.flatMap({ posts[$0] }), last.createAt > post.createAt {
-            let index = timeline.postIds.firstIndex { (posts[$0]?.createAt ?? 0) > post.createAt } ?? timeline.postIds.count
-            timeline.postIds.insert(post.id, at: index)
-        } else {
-            timeline.postIds.append(post.id)
+        guard var timeline = timelines[post.channelId], !timeline.postIds.contains(post.id) else { return }
+        if timeline.loaded, timeline.hasMoreOlder, let first = timeline.postIds.first.flatMap({ posts[$0] }), post.createAt < first.createAt {
+            return
         }
+        let index = timeline.postIds.lastIndex { (posts[$0]?.createAt ?? 0) <= post.createAt }.map { $0 + 1 } ?? 0
+        timeline.postIds.insert(post.id, at: index)
         timelines[post.channelId] = timeline
     }
 
     func receive(post: Post) {
+        guard !deletedPostIds.contains(post.id) else { return }
         let existed = posts[post.id] != nil
-        posts[post.id] = post
+        store(post)
         for emoji in post.metadata.emojis { customEmojis[emoji.name] = emoji }
         insertIntoTimeline(post)
         if !post.rootId.isEmpty, var thread = threads[post.rootId], !thread.postIds.contains(post.id) {
@@ -726,30 +934,26 @@ public final class ServerSession {
         }
     }
 
-    func removePost(_ postId: String) {
-        guard let post = posts[postId] else { return }
+    func removePost(_ postId: String, fallback: Post? = nil) {
+        guard !deletedPostIds.contains(postId), let post = posts[postId] ?? fallback else { return }
+        deletedPostIds.insert(postId)
         posts[postId] = nil
-        if var timeline = timelines[post.channelId] {
-            timeline.postIds.removeAll { $0 == postId }
-            timelines[post.channelId] = timeline
-        }
-        if !post.rootId.isEmpty {
-            if var thread = threads[post.rootId] {
-                thread.postIds.removeAll { $0 == postId }
-                threads[post.rootId] = thread
+        timelines[post.channelId]?.postIds.removeAll { $0 == postId }
+        if post.rootId.isEmpty {
+            threads[postId] = nil
+            let replies = Set(posts.values.filter { $0.rootId == postId }.map(\.id))
+            guard !replies.isEmpty else { return }
+            timelines[post.channelId]?.postIds.removeAll { replies.contains($0) }
+            for reply in replies {
+                posts[reply] = nil
+                pendingPostIds.remove(reply)
             }
+        } else {
+            threads[post.rootId]?.postIds.removeAll { $0 == postId }
             if var root = posts[post.rootId] {
                 root.replyCount = max(0, root.replyCount - 1)
                 posts[post.rootId] = root
             }
-        } else {
-            threads[postId] = nil
-            let replies = posts.values.filter { $0.rootId == postId }.map(\.id)
-            if var timeline = timelines[post.channelId] {
-                timeline.postIds.removeAll { replies.contains($0) }
-                timelines[post.channelId] = timeline
-            }
-            for reply in replies { posts[reply] = nil }
         }
     }
 
@@ -781,6 +985,8 @@ public final class ServerSession {
             currentChannelId = nil
             if let next = defaultChannel(teamId: teamId) {
                 Task { await self.selectChannel(next) }
+            } else {
+                onSelectionChange?(teamId, nil)
             }
         }
     }

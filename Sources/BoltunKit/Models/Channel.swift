@@ -179,7 +179,7 @@ public enum CategorySorting: String, Codable, Sendable {
     case `default` = ""
     case manual
     case recent
-    case alphabetical
+    case alphabetical = "alpha"
 }
 
 public struct ChannelCategory: Codable, Hashable, Identifiable, Sendable {

@@ -11,12 +11,32 @@ extension KeyedDecodingContainer {
 
     func int64(_ key: Key) -> Int64 {
         if let value = try? decodeIfPresent(Int64.self, forKey: key) { return value }
-        if let value = try? decodeIfPresent(Double.self, forKey: key) { return Int64(value) }
-        if let value = try? decodeIfPresent(String.self, forKey: key), let parsed = Int64(value) { return parsed }
+        if let value = try? decodeIfPresent(Double.self, forKey: key) { return Int64(clamping: value) }
+        if let value = try? decodeIfPresent(String.self, forKey: key) {
+            let trimmed = value.trimmingCharacters(in: .whitespaces)
+            if let parsed = Int64(trimmed) { return parsed }
+            if let parsed = Double(trimmed) { return Int64(clamping: parsed) }
+        }
         return 0
     }
 
     func int(_ key: Key) -> Int { Int(int64(key)) }
+}
+
+extension Int64 {
+    init(clamping value: Double) {
+        guard value.isFinite else {
+            self = 0
+            return
+        }
+        if value >= Double(Int64.max) {
+            self = .max
+        } else if value <= Double(Int64.min) {
+            self = .min
+        } else {
+            self = Int64(value)
+        }
+    }
 }
 
 public enum MattermostJSON {

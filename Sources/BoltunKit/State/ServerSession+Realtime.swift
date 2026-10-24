@@ -14,26 +14,47 @@ extension ServerSession {
         }
     }
 
+    public func reconnectRealtime() {
+        guard let realtime else { return }
+        Task { await realtime.reconnectNow() }
+    }
+
     func handle(realtime event: RealtimeEvent) async {
         switch event {
         case .connected(let needsResync):
+            guard connection != .unauthorized else { return }
             connection = .connected
             if needsResync { await resync() }
         case .disconnected:
-            if connection != .unauthorized { connection = .reconnecting }
+            guard connection != .unauthorized else { return }
+            connection = .reconnecting
+            Task { await self.verifySession() }
         case .event(let event):
+            guard connection != .unauthorized else { return }
             apply(event)
         }
     }
 
+    func verifySession() async {
+        do {
+            _ = try await client.me()
+        } catch {
+            report(error, silently: true)
+        }
+    }
+
     func resync() async {
+        for id in timelines.keys where id != currentChannelId {
+            timelines[id]?.loaded = false
+        }
         do {
             try await loadInitial()
-        } catch let error as APIError where error.isUnauthorized {
-            connection = .unauthorized
-            onUnauthorized?()
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            report(error)
+            return
+        }
+        for rootId in threads.keys {
+            await openThread(rootId: rootId)
         }
     }
 
@@ -42,29 +63,19 @@ extension ServerSession {
         case WebSocketEventType.posted:
             handlePosted(event)
         case WebSocketEventType.postEdited:
-            if let post = event.embedded(Post.self, "post") {
-                if posts[post.id] != nil || timelines[post.channelId]?.loaded == true {
-                    var merged = post
-                    if let old = posts[post.id], merged.metadata.reactions.isEmpty { merged.metadata.reactions = old.metadata.reactions }
-                    posts[post.id] = merged
-                }
-            }
+            handlePostEdited(event)
         case WebSocketEventType.postDeleted:
-            if let post = event.embedded(Post.self, "post") { removePost(post.id) }
+            if let post = event.embedded(Post.self, "post") { removePost(post.id, fallback: post) }
         case WebSocketEventType.reactionAdded, WebSocketEventType.reactionRemoved:
             if let reaction = event.embedded(Reaction.self, "reaction") {
                 applyReaction(reaction, added: event.event == WebSocketEventType.reactionAdded)
             }
         case WebSocketEventType.typing:
-            let userId = event.string("user_id") ?? ""
-            guard !userId.isEmpty else { return }
-            let key = typingKey(channelId: event.channelId, parentId: event.string("parent_id") ?? "")
-            typing[key, default: [:]][userId] = now()
-            if users[userId] == nil { Task { await self.ensureUsers([userId]) } }
+            handleTyping(event)
         case WebSocketEventType.channelViewed:
-            if let channelId = event.string("channel_id") { markLocallyViewed(channelId) }
+            if let channelId = event.string("channel_id") { viewedElsewhere([channelId]) }
         case WebSocketEventType.multipleChannelsViewed:
-            for channelId in (event.data["channel_times"]?.objectValue ?? [:]).keys { markLocallyViewed(channelId) }
+            viewedElsewhere(Array((event.data["channel_times"]?.objectValue ?? [:]).keys))
         case WebSocketEventType.postUnread:
             handlePostUnread(event)
         case WebSocketEventType.channelCreated, WebSocketEventType.directAdded, WebSocketEventType.groupAdded, WebSocketEventType.channelRestored:
@@ -79,7 +90,7 @@ extension ServerSession {
         case WebSocketEventType.channelDeleted:
             let channelId = event.string("channel_id") ?? event.channelId
             if var channel = channels[channelId] {
-                channel.deleteAt = Int64(event.data["delete_at"]?.doubleValue ?? Double(now().mattermostMillis))
+                channel.deleteAt = event.data["delete_at"]?.doubleValue.map { Int64(clamping: $0) } ?? now().mattermostMillis
                 channels[channelId] = channel
             }
         case WebSocketEventType.channelMemberUpdated:
@@ -104,8 +115,15 @@ extension ServerSession {
             if let userId = event.string("user_id"), let raw = event.string("status"), let status = UserStatusValue(rawValue: raw) {
                 statuses[userId] = status
             }
-        case WebSocketEventType.addedToTeam, WebSocketEventType.leaveTeam, WebSocketEventType.updateTeam:
+        case WebSocketEventType.addedToTeam:
             Task { await self.refreshTeams() }
+        case WebSocketEventType.leaveTeam:
+            if event.string("user_id") == myId { Task { await self.refreshTeams() } }
+        case WebSocketEventType.updateTeam:
+            if let team = event.embedded(Team.self, "team"), let index = teams.firstIndex(where: { $0.id == team.id }) {
+                teams[index] = team
+                teams = Self.sortedTeams(teams)
+            }
         case WebSocketEventType.preferencesChanged:
             if let list = event.embedded([Preference].self, "preferences") { applyPreferences(list) }
         case WebSocketEventType.preferencesDeleted:
@@ -118,7 +136,7 @@ extension ServerSession {
              WebSocketEventType.sidebarCategoryDeleted, WebSocketEventType.sidebarCategoryOrderUpdated:
             let teamId = event.broadcast.teamId.isEmpty ? (event.string("team_id") ?? "") : event.broadcast.teamId
             if loadedTeams.contains(teamId) {
-                Task { try? await self.refreshCategories(teamId: teamId) }
+                Task { _ = await self.quietly { try await self.refreshCategories(teamId: teamId) } }
             }
         case WebSocketEventType.emojiAdded:
             if let emoji = event.embedded(CustomEmoji.self, "emoji") { customEmojis[emoji.name] = emoji }
@@ -127,24 +145,74 @@ extension ServerSession {
         }
     }
 
+    func handlePostEdited(_ event: WebSocketEvent) {
+        guard let post = event.embedded(Post.self, "post"), !deletedPostIds.contains(post.id) else { return }
+        guard posts[post.id] != nil || timelines[post.channelId]?.loaded == true else { return }
+        var merged = post
+        if let old = posts[post.id] {
+            if old.updateAt > post.updateAt { return }
+            if merged.metadata.reactions.isEmpty { merged.metadata.reactions = old.metadata.reactions }
+        }
+        posts[post.id] = merged
+    }
+
+    func handleTyping(_ event: WebSocketEvent) {
+        let userId = event.string("user_id") ?? ""
+        guard !userId.isEmpty, userId != myId else { return }
+        let key = typingKey(channelId: event.channelId, parentId: event.string("parent_id") ?? "")
+        let stamp = now()
+        typing[key, default: [:]][userId] = stamp
+        let timeout = typingTimeout
+        Task { [weak self] in
+            try? await Task.sleep(for: timeout)
+            self?.expireTyping(key: key, userId: userId, stamp: stamp)
+        }
+        if users[userId] == nil { Task { await self.ensureUsers([userId]) } }
+    }
+
+    func expireTyping(key: String, userId: String, stamp: Date) {
+        guard typing[key]?[userId] == stamp else { return }
+        typing[key]?[userId] = nil
+        if typing[key]?.isEmpty == true { typing[key] = nil }
+    }
+
+    func clearTyping(channelId: String, parentId: String, userId: String) {
+        let key = typingKey(channelId: channelId, parentId: parentId)
+        guard typing[key]?[userId] != nil else { return }
+        typing[key]?[userId] = nil
+        if typing[key]?.isEmpty == true { typing[key] = nil }
+    }
+
     func handlePosted(_ event: WebSocketEvent) {
         guard let post = event.embedded(Post.self, "post") else { return }
-        let isNew = posts[post.id] == nil
-        typing[typingKey(channelId: post.channelId, parentId: post.rootId)]?[post.userId] = nil
-        if channels[post.channelId] == nil {
-            receive(post: post)
-            Task { await self.refreshChannel(post.channelId) }
-            return
+        if !post.pendingPostId.isEmpty { discardPending(post.pendingPostId) }
+        let isNew = posts[post.id] == nil && !deletedPostIds.contains(post.id)
+        clearTyping(channelId: post.channelId, parentId: post.rootId, userId: post.userId)
+        let mentions = event.embedded([String].self, "mentions") ?? []
+        let mentioned = !myId.isEmpty && mentions.contains(myId)
+        let eventTeamId = event.string("team_id").flatMap(\.nonEmpty) ?? event.broadcast.teamId.nonEmpty ?? ""
+        let channel = channels[post.channelId]
+        let teamId = channel.flatMap { $0.teamId.nonEmpty } ?? eventTeamId
+        let fromOthers = isNew && post.userId != myId
+        if fromOthers, !teamId.isEmpty, !loadedTeams.contains(teamId) {
+            var unread = teamUnreads[teamId] ?? TeamUnread(teamId: teamId)
+            unread.msgCount += 1
+            if post.rootId.isEmpty { unread.msgCountRoot += 1 }
+            if mentioned { unread.mentionCount += 1 }
+            teamUnreads[teamId] = unread
         }
         receive(post: post)
-        guard isNew, post.userId != myId else { return }
-        let mentions = event.embedded([String].self, "mentions") ?? []
-        let mentioned = mentions.contains(myId)
-        let channelType = channels[post.channelId]?.type ?? ChannelType(rawValue: event.string("channel_type") ?? "O") ?? .open
+        if channel == nil, teamId.isEmpty || loadedTeams.contains(teamId) {
+            Task { await self.refreshChannel(post.channelId) }
+        }
+        guard fromOthers else { return }
+        let channelType = channel?.type ?? ChannelType(rawValue: event.string("channel_type") ?? "") ?? .open
         let viewing = currentChannelId == post.channelId && isAppActive()
         if viewing {
-            Task { await self.markViewed(channelId: post.channelId) }
-        } else if var member = members[post.channelId], mentioned || channelType.isDirectOrGroup {
+            if !manuallyUnread.contains(post.channelId) {
+                Task { await self.markViewed(channelId: post.channelId) }
+            }
+        } else if channel != nil, var member = members[post.channelId], mentioned || channelType.isDirectOrGroup {
             member.mentionCount += 1
             if post.rootId.isEmpty { member.mentionCountRoot += 1 }
             members[post.channelId] = member
@@ -159,21 +227,45 @@ extension ServerSession {
             myStatus: statuses[myId],
             isViewingChannel: viewing
         )
-        guard shouldNotify, let channel = channels[post.channelId] else { return }
-        let sender = event.string("sender_name").map { $0.hasPrefix("@") ? String($0.dropFirst()) : $0 } ?? displayName(for: post)
-        let title = channelType == .direct ? sender : displayName(channel: channel)
-        let body = channelType == .direct ? NotificationPolicy.preview(post.message) : "\(sender): \(NotificationPolicy.preview(post.message))"
-        let teamId = channel.teamId.isEmpty ? (event.string("team_id") ?? currentTeamId ?? "") : channel.teamId
-        onNotification?(MentionNotification(serverId: serverId, teamId: teamId, channelId: post.channelId, postId: post.id, rootId: post.rootId, title: title, body: body.isEmpty ? "Sent an attachment" : body))
+        guard shouldNotify else { return }
+        let sender = event.string("sender_name").flatMap(\.nonEmpty).map { $0.hasPrefix("@") ? String($0.dropFirst()) : $0 } ?? displayName(for: post)
+        let channelTitle = channel.map { displayName(channel: $0) } ?? event.string("channel_display_name") ?? ""
+        let title = channelType == .direct ? sender : channelTitle
+        let preview = NotificationPolicy.preview(post.message)
+        let body = channelType == .direct ? preview : "\(sender): \(preview)"
+        onNotification?(MentionNotification(
+            serverId: serverId,
+            teamId: teamId.isEmpty ? (currentTeamId ?? "") : teamId,
+            channelId: post.channelId,
+            postId: post.id,
+            rootId: post.rootId,
+            title: title,
+            body: preview.isEmpty ? "Sent an attachment" : body
+        ))
     }
 
     func handlePostUnread(_ event: WebSocketEvent) {
         let channelId = event.channelId
         guard var member = members[channelId] else { return }
         member.msgCount = event.data["msg_count"]?.intValue ?? member.msgCount
+        member.msgCountRoot = event.data["msg_count_root"]?.intValue ?? member.msgCountRoot
         member.mentionCount = event.data["mention_count"]?.intValue ?? member.mentionCount
-        member.lastViewedAt = Int64(event.data["last_viewed_at"]?.doubleValue ?? Double(member.lastViewedAt))
+        member.mentionCountRoot = event.data["mention_count_root"]?.intValue ?? member.mentionCountRoot
+        member.urgentMentionCount = event.data["urgent_mention_count"]?.intValue ?? member.urgentMentionCount
+        member.lastViewedAt = event.data["last_viewed_at"]?.doubleValue.map { Int64(clamping: $0) } ?? member.lastViewedAt
         members[channelId] = member
+    }
+
+    func viewedElsewhere(_ channelIds: [String]) {
+        var unknown = false
+        for channelId in channelIds {
+            if members[channelId] != nil && channels[channelId] != nil {
+                markLocallyViewed(channelId)
+            } else {
+                unknown = true
+            }
+        }
+        if unknown { Task { await self.refreshTeamUnreads() } }
     }
 
     func markLocallyViewed(_ channelId: String) {
@@ -182,6 +274,7 @@ extension ServerSession {
         member.msgCountRoot = channel.totalMsgCountRoot
         member.mentionCount = 0
         member.mentionCountRoot = 0
+        member.urgentMentionCount = 0
         member.lastViewedAt = max(member.lastViewedAt, channel.lastPostAt)
         members[channelId] = member
     }
@@ -197,21 +290,27 @@ extension ServerSession {
             if let partner = channel.directPartnerId(me: myId) { await ensureUsers([partner]) }
             let teamIds = channel.teamId.isEmpty ? Array(loadedTeams) : [channel.teamId]
             for teamId in teamIds where loadedTeams.contains(teamId) {
-                try? await refreshCategories(teamId: teamId)
+                _ = await quietly { try await refreshCategories(teamId: teamId) }
             }
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            report(error, silently: true)
         }
     }
 
     func refreshTeams() async {
-        guard let list = try? await client.myTeams() else { return }
-        teams = list.filter { $0.deleteAt == 0 }.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
-        if let unreads = try? await client.myTeamUnreads() {
-            teamUnreads = Dictionary(unreads.map { ($0.teamId, $0) }, uniquingKeysWith: { a, _ in a })
-        }
-        if let teamId = currentTeamId, !teams.contains(where: { $0.id == teamId }) {
-            if let first = teams.first { await selectTeam(first.id) } else { currentTeamId = nil; currentChannelId = nil }
+        guard let list = await quietly({ try await client.myTeams() }) else { return }
+        teams = Self.sortedTeams(list)
+        await refreshTeamUnreads()
+        let remaining = Set(teams.map(\.id))
+        loadedTeams = loadedTeams.intersection(remaining)
+        if let teamId = currentTeamId, !remaining.contains(teamId) {
+            if let first = teams.first {
+                await selectTeam(first.id)
+            } else {
+                currentTeamId = nil
+                currentChannelId = nil
+                onSelectionChange?(nil, nil)
+            }
         }
     }
 }

@@ -80,13 +80,17 @@ public struct TeamUnread: Codable, Hashable, Sendable {
     public var mentionCount: Int
     public var threadCount: Int
     public var threadMentionCount: Int
+    public var msgCountRoot: Int
+    public var mentionCountRoot: Int
 
-    public init(teamId: String, msgCount: Int = 0, mentionCount: Int = 0, threadCount: Int = 0, threadMentionCount: Int = 0) {
+    public init(teamId: String, msgCount: Int = 0, mentionCount: Int = 0, threadCount: Int = 0, threadMentionCount: Int = 0, msgCountRoot: Int = 0, mentionCountRoot: Int = 0) {
         self.teamId = teamId
         self.msgCount = msgCount
         self.mentionCount = mentionCount
         self.threadCount = threadCount
         self.threadMentionCount = threadMentionCount
+        self.msgCountRoot = msgCountRoot
+        self.mentionCountRoot = mentionCountRoot
     }
 
     enum CodingKeys: String, CodingKey {
@@ -95,6 +99,8 @@ public struct TeamUnread: Codable, Hashable, Sendable {
         case mentionCount = "mention_count"
         case threadCount = "thread_count"
         case threadMentionCount = "thread_mention_count"
+        case msgCountRoot = "msg_count_root"
+        case mentionCountRoot = "mention_count_root"
     }
 
     public init(from decoder: Decoder) throws {
@@ -104,5 +110,7 @@ public struct TeamUnread: Codable, Hashable, Sendable {
         mentionCount = c.int(.mentionCount)
         threadCount = c.int(.threadCount)
         threadMentionCount = c.int(.threadMentionCount)
+        msgCountRoot = c.int(.msgCountRoot)
+        mentionCountRoot = c.int(.mentionCountRoot)
     }
 }
