@@ -124,7 +124,7 @@ struct AppShellTests {
         let harness = Harness(servers: [server], tokens: [server.id: "token"])
         let environment = harness.environment()
         environment.launch()
-        #expect(await eventually(timeout: .seconds(10)) { harness.model.session(for: server.id)?.connection == .connected })
+        #expect(await eventually { harness.model.session(for: server.id)?.connection == .connected })
         environment.mainWindow?.orderOut(nil)
     }
 
