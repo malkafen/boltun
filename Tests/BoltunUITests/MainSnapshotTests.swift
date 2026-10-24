@@ -24,6 +24,18 @@ struct MainSnapshotTests {
         #expect(MainSnapshot.distinctColors(rep) > 12)
     }
 
+    @Test func leftRailShowsServerSwitcherAndTeams() async {
+        let (model, session) = Fixture.appModel()
+        await model.selectServer(at: 0)
+        session.teams.append(Team(id: "t3", name: "ops", displayName: "Operations", lastTeamIconUpdate: 1))
+        let rail = await MainSnapshot.render(LeftRail(model: model, onAddServer: {}), size: CGSize(width: LeftRail.width, height: 400), name: "left-rail")
+        #expect(MainSnapshot.distinctColors(rail) > 4)
+        await model.selectServer(at: 1)
+        await MainSnapshot.render(LeftRail(model: model, onAddServer: {}), size: CGSize(width: LeftRail.width, height: 400), name: "left-rail-login")
+        let header = await MainSnapshot.render(SidebarHeader(workspace: Fixture.workspace()).environment(\.appRouter, AppRouter(model: model)), size: CGSize(width: 250, height: 52))
+        #expect(header.pixelsWide >= 250)
+    }
+
     @Test func workspaceWithThreadPane() async {
         let workspace = Fixture.workspace(transport: threadTransport())
         await workspace.openThread(rootId: "p1")
@@ -182,7 +194,10 @@ struct MainSnapshotTests {
             ServerTileModel(id: UUID(), name: "D", initials: "D", index: 3, selected: false, unread: false, mentions: 0, hint: .needsLogin),
         ]
         let view = HStack(alignment: .top, spacing: 20) {
-            VStack(spacing: 10) { ForEach(tiles) { ServerTile(tile: $0) {} } }
+            VStack(spacing: 10) {
+                ForEach(tiles) { ServerSwitcherLabel(current: $0, others: ChannelUnread(unread: true, mentions: $0.index)) }
+                ServerSwitcherLabel(current: nil, others: ChannelUnread(unread: true))
+            }
             VStack(alignment: .leading, spacing: 10) {
                 ForEach([UserStatusValue.online, .away, .dnd, .offline], id: \.self) { status in
                     Avatar(url: nil, client: nil, name: "Zed \(status.rawValue)", size: 36, status: status)
@@ -216,6 +231,8 @@ struct MainSnapshotTests {
         workspace.session.categories["t1"]?[1].collapsed = true
         workspace.session.teams = [Team(id: "t1", name: "engineering", displayName: "Engineering")]
         await MainSnapshot.render(ChannelSidebar(workspace: workspace), size: CGSize(width: 250, height: 600), name: "sidebar-collapsed")
+        let tile = TeamTileModel(id: "t", name: "T", initials: "T", index: 0, selected: false, unread: true, mentions: 0)
+        await MainSnapshot.render(VStack { TeamTile(tile: tile, client: nil) {} }, size: CGSize(width: LeftRail.width, height: 50))
         await MainSnapshot.render(SidebarSectionHeader(section: SidebarSection(id: "d", title: "Direct Messages", type: .directMessages, collapsed: false, channelIds: []), onToggle: {}, onAdd: {}), size: CGSize(width: 250, height: 40))
     }
 }

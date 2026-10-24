@@ -249,7 +249,9 @@ public extension APIClient {
 
     func customEmojiImageURL(id: String) -> URL { url("emoji/\(id)/image") }
 
-    func teamIconURL(teamId: String) -> URL { url("teams/\(teamId)/image") }
+    func teamIconURL(teamId: String, lastIconUpdate: Int64 = 0) -> URL {
+        url("teams/\(teamId)/image", query: lastIconUpdate > 0 ? ["_": String(lastIconUpdate)] : [:])
+    }
 }
 
 struct NewPost: Encodable {

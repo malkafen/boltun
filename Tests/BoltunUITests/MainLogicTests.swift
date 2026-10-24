@@ -525,6 +525,40 @@ import Testing
         #expect(tile.tooltip == "Acme Corp — Cannot connect")
         tile.hint = .connecting
         #expect(tile.tooltip.contains("Connecting"))
+        #expect(tiles[0].menuTitle == "✓ Acme Corp  (4)")
+        #expect(tiles[1].menuTitle.hasSuffix(" — Login required"))
+        #expect(!tiles[1].menuTitle.hasPrefix("✓"))
+        let others = ServerTileModel.otherServersUnread(tiles)
+        #expect(others.mentions == tiles[1].mentions + tiles[2].mentions)
+        #expect(others.unread == (tiles[1].unread || tiles[2].unread))
+        #expect(ServerTileModel.otherServersUnread([tiles[0]]) == ChannelUnread())
+    }
+
+    @Test func teamTiles() {
+        let session = Fixture.session()
+        session.teams.append(Team(id: "t3", name: "ops-team", displayName: "", lastTeamIconUpdate: 42))
+        let tiles = TeamTileModel.make(session: session)
+        #expect(tiles.map(\.id) == ["t1", "t2", "t3"])
+        #expect(tiles[0].selected && !tiles[1].selected)
+        #expect(tiles[0].initials == "E")
+        #expect(tiles[2].initials == "OT")
+        #expect(tiles[1].unread && tiles[1].mentions == 1)
+        #expect(tiles[0].iconURL == nil)
+        #expect(tiles[2].iconURL?.absoluteString.hasSuffix("teams/t3/image?_=42") == true)
+        #expect(tiles[2].name == "ops-team")
+        #expect(tiles[0].tooltip == "Engineering — ⌃⌘1")
+        var far = tiles[1]
+        far.index = 9
+        #expect(far.shortcutLabel == nil)
+        #expect(far.tooltip == "Design")
+    }
+
+    @Test func teamNavigatorByNumber() {
+        #expect(TeamNavigator.team(number: 1, in: ["a", "b"]) == "a")
+        #expect(TeamNavigator.team(number: 2, in: ["a", "b"]) == "b")
+        #expect(TeamNavigator.team(number: 3, in: ["a", "b"]) == nil)
+        #expect(TeamNavigator.team(number: 0, in: ["a", "b"]) == nil)
+        #expect(TeamNavigator.team(number: 1, in: []) == nil)
     }
 
     @Test func sidebarRows() {
@@ -554,9 +588,9 @@ import Testing
     }
 
     @Test func smallHelpers() {
-        #expect(TeamMenuLabel.text(name: "Eng", unread: ChannelUnread(unread: true, mentions: 3), current: true) == "✓ Eng  (3)")
-        #expect(TeamMenuLabel.text(name: "Eng", unread: ChannelUnread(unread: true), current: false) == "Eng  •")
-        #expect(TeamMenuLabel.text(name: "Eng", unread: .none, current: false) == "Eng")
+        #expect(SwitcherLabel.text(name: "Eng", unread: ChannelUnread(unread: true, mentions: 3), current: true) == "✓ Eng  (3)")
+        #expect(SwitcherLabel.text(name: "Eng", unread: ChannelUnread(unread: true), current: false) == "Eng  •")
+        #expect(SwitcherLabel.text(name: "Eng", unread: .none, current: false) == "Eng")
         #expect(ChannelHeader.subtitle(for: Channel(id: "c", name: "c", header: "line1\nline2", purpose: "p")) == "line1 line2")
         #expect(ChannelHeader.subtitle(for: Channel(id: "c", name: "c", purpose: "just purpose")) == "just purpose")
         #expect(ChannelIntro.text(for: Channel(id: "c", type: .direct, name: "a__b"), name: "alice").contains("conversation with alice"))

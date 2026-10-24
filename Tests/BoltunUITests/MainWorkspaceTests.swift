@@ -259,6 +259,26 @@ func body(_ request: URLRequest) -> [String: Any] {
         #expect(["offtopic", "secret"].contains(workspace.session.currentChannelId ?? ""))
     }
 
+    @Test func teamSelectionByNumberAndOffset() async {
+        let workspace = Fixture.workspace()
+        let session = workspace.session
+        session.loadedTeams = ["t1", "t2"]
+        await session.switchTeam(number: 2)
+        #expect(session.currentTeamId == "t2")
+        #expect(session.currentChannelId == "design-general")
+        await session.switchTeam(number: 5)
+        #expect(session.currentTeamId == "t2")
+        await session.switchTeam(id: "t2")
+        #expect(session.currentChannelId == "design-general")
+        await session.cycleTeam(offset: 1)
+        #expect(session.currentTeamId == "t1")
+        await session.cycleTeam(offset: -1)
+        #expect(session.currentTeamId == "t2")
+        session.teams = []
+        await session.cycleTeam(offset: 1)
+        #expect(session.currentTeamId == "t2")
+    }
+
     @Test func quickSwitchItemsCoverChannelsAndDirects() {
         let workspace = Fixture.workspace()
         let items = workspace.quickSwitchItems()

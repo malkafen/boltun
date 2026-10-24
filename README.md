@@ -7,7 +7,8 @@ no bundled browser, no web view, just the Mattermost REST API and WebSocket.
 ## Features
 
 - Multiple servers side by side, each with its own session and unread/mention badges
-- Teams, sidebar categories (favorites, channels, direct messages), unread and mention counters
+- Teams in a vertical team sidebar with icons and unread badges (⌃⌘1…9 jumps to a team, ⌃⌘↑/↓ cycles teams)
+- Sidebar categories (favorites, channels, direct messages), unread and mention counters
 - Real-time messages, edits, deletions, reactions and typing indicators over WebSocket
 - Markdown rendering, emoji, @mentions, code blocks, links, file attachments and image previews
 - Threads, search, quick channel switcher
