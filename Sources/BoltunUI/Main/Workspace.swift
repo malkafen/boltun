@@ -53,6 +53,7 @@ final class Workspace {
     var showBrowseChannels = false
     var showDirectMessages = false
     var pendingDeletion: Post?
+    var pendingBurn: Post?
     var previewFile: FileInfo?
     var notificationPreferences: ChannelNotificationsTarget?
     var downloading: Set<String> = []
@@ -300,6 +301,29 @@ final class Workspace {
         await session.setPinned(postId: post.id, pinned: !post.isPinned)
     }
 
+    func toggleAcknowledgement(postId: String) async {
+        await session.toggleAcknowledgement(postId: postId)
+    }
+
+    func revealBurnOnRead(postId: String) async {
+        await session.revealBurnOnRead(postId: postId)
+    }
+
+    func burnOnReadActivated(_ model: BurnOnReadRowModel) {
+        if model.isSender {
+            pendingBurn = session.posts[model.postId]
+        } else if !model.isRevealed {
+            Task { await revealBurnOnRead(postId: model.postId) }
+        }
+    }
+
+    func confirmBurn() async {
+        guard let post = pendingBurn else { return }
+        pendingBurn = nil
+        await session.burn(postId: post.id)
+        if threadRootId == post.id { rightPane = nil }
+    }
+
     @discardableResult
     func download(_ file: FileInfo) async -> URL? {
         guard !downloading.contains(file.id) else { return nil }
@@ -364,7 +388,13 @@ final class Workspace {
             showReplyContext: showReplyContext,
             collapsedThreads: collapsedThreads,
             followThreads: followThreads,
+            postPriorityEnabled: session.postPriorityEnabled,
+            acknowledgementsEnabled: session.acknowledgementsEnabled,
+            burnOnReadEnabled: session.burnOnReadEnabled,
             openThreadId: threadRootId,
+            canToggleAcknowledgement: { session.canToggleAcknowledgement(postId: $0) },
+            burnOnReadReceipt: { session.burnOnReadReceipt(postId: $0) },
+            isRevealing: { session.isRevealing(postId: $0) },
             displayName: { session.displayName(for: $0) },
             userName: { session.displayName(userId: $0) },
             post: { session.posts[$0] },

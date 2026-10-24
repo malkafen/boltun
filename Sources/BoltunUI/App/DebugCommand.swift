@@ -52,6 +52,11 @@ public enum DebugCommand: Equatable, Sendable {
     case mute(on: Bool)
     case notifyPrefs(mute: Bool?, desktop: NotificationLevel?, threads: Bool?, ignore: Bool?)
     case teamMute(team: String, on: Bool)
+    case acknowledge(index: Int, postId: String?)
+    case priority(PostPriority)
+    case burnOnRead(on: Bool)
+    case reveal(index: Int, postId: String?)
+    case burn(index: Int, postId: String?)
 
     public enum TeamMoveTarget: Equatable, Sendable {
         case team(String)
@@ -203,6 +208,21 @@ public enum DebugCommand: Equatable, Sendable {
         case "team-mute":
             guard let team = nonEmpty(query["team"]) else { return nil }
             return .teamMute(team: team, on: query["on"].map(flag) ?? true)
+        case "acknowledge":
+            return .acknowledge(index: index(query["index"]) ?? 0, postId: nonEmpty(query["post"]))
+        case "priority":
+            guard let level = query["level"].flatMap(priorityLevel) else { return nil }
+            return .priority(PostPriority(
+                priority: level,
+                requestedAck: flag(query["ack"]),
+                persistentNotifications: flag(query["notify"])
+            ))
+        case "burn-on-read":
+            return .burnOnRead(on: query["on"].map(flag) ?? true)
+        case "reveal":
+            return .reveal(index: index(query["index"]) ?? 0, postId: nonEmpty(query["post"]))
+        case "burn":
+            return .burn(index: index(query["index"]) ?? 0, postId: nonEmpty(query["post"]))
         default:
             return nil
         }
@@ -216,6 +236,15 @@ public enum DebugCommand: Equatable, Sendable {
         let ignore = query["ignore"].map(flag)
         guard mute != nil || desktop != nil || threads != nil || ignore != nil else { return nil }
         return .notifyPrefs(mute: mute, desktop: desktop, threads: threads, ignore: ignore)
+    }
+
+    static func priorityLevel(_ value: String) -> PostPriorityLevel? {
+        switch value.lowercased() {
+        case "standard", "none", "": return .standard
+        case "important": return .important
+        case "urgent": return .urgent
+        default: return nil
+        }
     }
 
     static func flag(_ value: String?) -> Bool {

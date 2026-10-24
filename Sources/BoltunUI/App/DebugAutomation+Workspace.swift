@@ -3,6 +3,14 @@ import BoltunKit
 import Foundation
 
 struct AutomationUIState: Codable, Equatable, Sendable {
+    struct BurnOnReadSummary: Codable, Equatable, Sendable {
+        var isSender: Bool
+        var revealed: Bool
+        var expireAt: Int64
+        var readBy: Int
+        var recipients: Int?
+    }
+
     struct PostSummary: Codable, Equatable, Sendable {
         var id: String
         var user: String
@@ -14,6 +22,10 @@ struct AutomationUIState: Codable, Equatable, Sendable {
         var replyCount: Int = 0
         var following: Bool?
         var status: String?
+        var priority: String?
+        var requestedAck: Bool = false
+        var acknowledgedBy: [String] = []
+        var burnOnRead: BurnOnReadSummary?
     }
 
     struct Composer: Codable, Equatable, Sendable {
@@ -23,6 +35,18 @@ struct AutomationUIState: Codable, Equatable, Sendable {
         var selectedSuggestion: Int
         var uploads: [String]
         var height: Double
+        var priority: String = ""
+        var requestedAck = false
+        var persistentNotifications = false
+        var burnOnRead = false
+    }
+
+    struct ReadInfoFeatures: Codable, Equatable, Sendable {
+        var postPriority: Bool
+        var acknowledgements: Bool
+        var persistentNotifications: Bool
+        var burnOnRead: Bool
+        var licenseSku: String
     }
 
     var windowTitle: String
@@ -55,6 +79,7 @@ struct AutomationUIState: Codable, Equatable, Sendable {
     var collapsedThreads = false
     var myStatus: String?
     var threadFollowing: Bool?
+    var readInfo: ReadInfoFeatures?
 
     struct Editor: Codable, Equatable, Sendable {
         var spellChecking: Bool
@@ -213,6 +238,30 @@ extension DebugAutomation {
             let team = try team(named: name, in: session)
             session.setMuted(teamId: team.id, on)
             return session.teamLayout.muted.joined(separator: ",")
+        case .acknowledge(let index, let postId):
+            let target = try postId ?? post(workspace, fromEnd: index).id
+            await workspace.toggleAcknowledgement(postId: target)
+            return "\(session.posts[target]?.acknowledgements.count ?? 0)"
+        case .priority(let priority):
+            let state = try composer(workspace, thread: false)
+            guard state.supportsPriority else { throw AutomationError.failed("message priority disabled") }
+            state.apply(priority: priority)
+            return "\(state.priority.priority.rawValue):\(state.priority.requestedAck):\(state.priority.persistentNotifications)"
+        case .burnOnRead(let on):
+            let state = try composer(workspace, thread: false)
+            guard !on || state.supportsBurnOnRead else { throw AutomationError.failed("burn on read disabled") }
+            state.setBurnOnRead(on)
+            return "\(state.burnOnRead)"
+        case .reveal(let index, let postId):
+            let target = try postId ?? post(workspace, fromEnd: index).id
+            await workspace.revealBurnOnRead(postId: target)
+            return session.posts[target].map { "\($0.isBurnOnReadRevealed(by: session.myId))" } ?? "gone"
+        case .burn(let index, let postId):
+            let target = try postId ?? post(workspace, fromEnd: index).id
+            guard let post = session.posts[target] else { throw AutomationError.failed("no post \(target)") }
+            workspace.pendingBurn = post
+            await workspace.confirmBurn()
+            return target
         case .teamFavorite(let name, let on):
             let team = try team(named: name, in: session)
             session.setFavorite(teamId: team.id, favorite: on)
@@ -317,6 +366,7 @@ extension DebugAutomation {
         if workspace.previewFile != nil { sheets.append("image-preview") }
         if workspace.pendingDeletion != nil { sheets.append("delete-confirmation") }
         if workspace.notificationPreferences != nil { sheets.append("notification-preferences") }
+        if workspace.pendingBurn != nil { sheets.append("burn-confirmation") }
         let threadComposer = workspace.threadRootId.flatMap { rootId in
             session.posts[rootId].map { workspace.composer(for: ComposerTarget(channelId: $0.channelId, rootId: rootId)) }
         }
@@ -355,7 +405,14 @@ extension DebugAutomation {
             editors: Self.editors(in: host?.mainWindow?.contentView),
             collapsedThreads: session.collapsedThreads,
             myStatus: session.statuses[session.myId]?.rawValue,
-            threadFollowing: workspace.threadFollowing
+            threadFollowing: workspace.threadFollowing,
+            readInfo: AutomationUIState.ReadInfoFeatures(
+                postPriority: session.postPriorityEnabled,
+                acknowledgements: session.acknowledgementsEnabled,
+                persistentNotifications: session.persistentNotificationsEnabled,
+                burnOnRead: session.burnOnReadEnabled,
+                licenseSku: session.license.skuShortName
+            )
         )
     }
 
@@ -378,7 +435,22 @@ extension DebugAutomation {
             edited: post.isEdited,
             replyCount: post.replyCount,
             following: post.isReply ? nil : session.isFollowing(threadId: post.id),
-            status: session.statuses[post.userId]?.rawValue
+            status: session.statuses[post.userId]?.rawValue,
+            priority: post.priorityLevel.isLabelled ? post.priorityLevel.rawValue : nil,
+            requestedAck: post.requestsAcknowledgement,
+            acknowledgedBy: post.acknowledgements.map { session.displayName(userId: $0.userId) },
+            burnOnRead: burnOnReadSummary(post, session: session)
+        )
+    }
+
+    static func burnOnReadSummary(_ post: Post, session: ServerSession) -> AutomationUIState.BurnOnReadSummary? {
+        guard post.isBurnOnRead else { return nil }
+        return AutomationUIState.BurnOnReadSummary(
+            isSender: post.userId == session.myId,
+            revealed: post.isBurnOnReadRevealed(by: session.myId),
+            expireAt: post.burnOnReadExpireAt,
+            readBy: post.burnOnReadRevealedBy.count,
+            recipients: session.burnOnReadReceipt(postId: post.id)?.totalRecipients
         )
     }
 
@@ -395,7 +467,11 @@ extension DebugAutomation {
                 case .failed: return "\(upload.filename):failed"
                 }
             },
-            height: Double(composer.editorHeight)
+            height: Double(composer.editorHeight),
+            priority: composer.priority.priority.rawValue,
+            requestedAck: composer.priority.requestedAck,
+            persistentNotifications: composer.priority.persistentNotifications,
+            burnOnRead: composer.burnOnRead
         )
     }
 

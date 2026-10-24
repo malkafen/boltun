@@ -92,6 +92,11 @@ from the newest regular post, so `index=0` is the last one.
 | `link?url=<percent-encoded url>` | Handles a link as if it was clicked in a message, including permalinks and channel links. |
 | `notification-click?channel=<id>[&server=<index>][&team=<id>][&root=<id>]` | Routes a notification response the same way as clicking a delivered notification. |
 | `follow[?on=0][&post=<root id>]` | Follows the open thread (or the given root post), or unfollows it with `on=0`. The detail is the resulting state. |
+| `priority?level=standard\|important\|urgent[&ack=1][&notify=1]` | Sets the channel composer's message priority, acknowledgement request and persistent notifications, as the priority picker does. The detail is `level:ack:notify` after gating. |
+| `burn-on-read[?on=0]` | Turns the composer's burn-on-read mode on, or off with `on=0`. The detail is the resulting state. |
+| `acknowledge[?index=<n>][&post=<id>]` | Toggles your acknowledgement on a post that requested one. The detail is the resulting acknowledgement count. |
+| `reveal[?index=<n>][&post=<id>]` | Reveals a burn-on-read message you received, as clicking "View message" does. The detail is the resulting revealed state. |
+| `burn[?index=<n>][&post=<id>]` | Deletes a burn-on-read message for everyone, as confirming the fire badge does. |
 | `set-status?status=online\|away\|dnd\|offline` | Sets your own status, as the avatar menu in the sidebar header does. The detail is the resulting status. |
 | `command?name=<name>[&number=<n>]` | Runs a menu or keyboard command, listed below. |
 
@@ -108,6 +113,13 @@ suggestions, uploads, height), typing users, unread and mention channels, favori
 the last session error, the workspace and cached post counts, `editors`, the spell-checking and font size of every
 live composer text view, `collapsedThreads`, `myStatus` and `threadFollowing` for the open thread. Post summaries carry
 `replyCount`, the author's `status` and, for root posts, `following`.
+
+Message read information is reported too. `readInfo` names the server-side gating (`postPriority`,
+`acknowledgements`, `persistentNotifications`, `burnOnRead` and the `licenseSku` they come from). Post summaries carry
+`priority`, `requestedAck`, `acknowledgedBy` (display names, newest acknowledgement first) and, for burn-on-read posts,
+`burnOnRead` with `isSender`, `revealed`, `expireAt`, `readBy` and `recipients`. Both composers report `priority`,
+`requestedAck`, `persistentNotifications` and `burnOnRead`. The burn-on-read confirmation shows up in `sheets` as
+`burn-confirmation`.
 
 Output paths must be absolute and inside `/tmp` or `/private/tmp`; paths containing `..` and existing symbolic links
 are rejected.

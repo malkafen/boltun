@@ -95,10 +95,19 @@ struct MessageRow: View, Equatable {
             VStack(alignment: .leading, spacing: 3) {
                 if !model.isContinuation { header }
                 if let reply = model.replyContext { ReplyIndicator(context: reply) { open(thread: reply.rootId) } }
-                content
+                if let burn = model.burnOnRead, burn.showsPlaceholder {
+                    BurnOnReadPlaceholder(model: burn) { Task { await workspace.revealBurnOnRead(postId: burn.postId) } }
+                } else {
+                    content
+                }
                 if !post.isDeleted {
                     if !post.attachments.isEmpty { AttachmentsView(attachments: post.attachments) }
                     if !post.metadata.files.isEmpty { FilesView(files: post.metadata.files, workspace: workspace) }
+                    if let acknowledgement = model.acknowledgement {
+                        AcknowledgementButton(model: acknowledgement, client: workspace.session.client) {
+                            Task { await workspace.toggleAcknowledgement(postId: acknowledgement.postId) }
+                        }
+                    }
                     if !model.reactions.isEmpty { reactions }
                     if !inThread {
                         if let thread = model.thread {
@@ -174,6 +183,14 @@ struct MessageRow: View, Equatable {
                 .scaledFont(11.5)
                 .foregroundStyle(Theme.textSecondary)
                 .help(model.fullTimeText)
+            PostPriorityBadge(level: model.priority)
+            if let burn = model.burnOnRead {
+                if burn.showsTimer {
+                    BurnOnReadTimerChip(model: burn, now: workspace.now) { workspace.pendingBurn = post }
+                } else if burn.showsBadge {
+                    BurnOnReadBadge(model: burn) { workspace.burnOnReadActivated(burn) }
+                }
+            }
             if post.isPinned {
                 Label("Pinned", systemImage: "pin.fill")
                     .labelStyle(.titleAndIcon)

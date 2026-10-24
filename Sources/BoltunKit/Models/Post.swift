@@ -122,12 +122,34 @@ public struct PostMetadata: Codable, Hashable, Sendable {
     public var reactions: [Reaction]
     public var emojis: [CustomEmoji]
     public var embeds: [PostEmbed]
+    public var priority: PostPriority?
+    public var acknowledgements: [PostAcknowledgement]
+    public var recipients: [String]
+    public var expireAt: Int64
 
-    public init(files: [FileInfo] = [], reactions: [Reaction] = [], emojis: [CustomEmoji] = [], embeds: [PostEmbed] = []) {
+    public init(
+        files: [FileInfo] = [],
+        reactions: [Reaction] = [],
+        emojis: [CustomEmoji] = [],
+        embeds: [PostEmbed] = [],
+        priority: PostPriority? = nil,
+        acknowledgements: [PostAcknowledgement] = [],
+        recipients: [String] = [],
+        expireAt: Int64 = 0
+    ) {
         self.files = files
         self.reactions = reactions
         self.emojis = emojis
         self.embeds = embeds
+        self.priority = priority
+        self.acknowledgements = acknowledgements
+        self.recipients = recipients
+        self.expireAt = expireAt
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case files, reactions, emojis, embeds, priority, acknowledgements, recipients
+        case expireAt = "expire_at"
     }
 
     public init(from decoder: Decoder) throws {
@@ -136,6 +158,10 @@ public struct PostMetadata: Codable, Hashable, Sendable {
         reactions = c.value(.reactions, default: [])
         emojis = c.value(.emojis, default: [])
         embeds = c.value(.embeds, default: [])
+        priority = c.optional(.priority)
+        acknowledgements = c.value(.acknowledgements, default: [])
+        recipients = c.value(.recipients, default: [])
+        expireAt = c.int64(.expireAt)
     }
 }
 
