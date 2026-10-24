@@ -152,6 +152,7 @@ extension ServerSession {
         if let old = posts[post.id] {
             if old.updateAt > post.updateAt { return }
             if merged.metadata.reactions.isEmpty { merged.metadata.reactions = old.metadata.reactions }
+            merged = merged.mergingThreadSummary(from: old)
         }
         posts[post.id] = merged
     }
@@ -304,7 +305,7 @@ extension ServerSession {
         let remaining = Set(teams.map(\.id))
         loadedTeams = loadedTeams.intersection(remaining)
         if let teamId = currentTeamId, !remaining.contains(teamId) {
-            if let first = teams.first {
+            if let first = orderedTeams.first {
                 await selectTeam(first.id)
             } else {
                 currentTeamId = nil

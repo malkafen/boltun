@@ -26,6 +26,10 @@ public struct GeneralSettingsView: View {
                 Toggle("Show unread badge on the Dock icon", isOn: $model.settings.showUnreadBadge)
             }
             Section("Messages") {
+                Toggle(isOn: $model.settings.collapsedThreads) {
+                    Text("Collapsed reply threads")
+                    Text("Show replies in the thread pane instead of the channel.")
+                }
                 Toggle("Check spelling while typing", isOn: $model.settings.spellChecking)
                 LabeledContent("Text size") {
                     HStack {

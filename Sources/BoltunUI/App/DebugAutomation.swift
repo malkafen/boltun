@@ -12,6 +12,7 @@ public struct AutomationState: Codable, Equatable, Sendable {
         public var needsLogin: Bool
         public var user: String?
         public var teams: [String]
+        public var favoriteTeams: [String]
         public var team: String?
         public var channel: String?
         public var channelDisplayName: String?
@@ -47,7 +48,8 @@ public struct AutomationState: Codable, Equatable, Sendable {
                 connection: session.map { Self.describe($0.connection) } ?? "none",
                 needsLogin: model.needsLogin.contains(server.id),
                 user: session?.me?.username,
-                teams: session?.teams.map(\.name) ?? [],
+                teams: session?.orderedTeams.map(\.name) ?? [],
+                favoriteTeams: session?.teamSections.favorites.map(\.name) ?? [],
                 team: session?.currentTeam?.name,
                 channel: session?.currentChannel?.name,
                 channelDisplayName: session?.currentChannel.map { session!.displayName(channel: $0) },
@@ -187,6 +189,7 @@ public final class DebugAutomation {
         case .setting(let name, let value):
             switch name {
             case "spellChecking": model.settings.spellChecking = DebugCommand.flag(value)
+            case "collapsedThreads": model.settings.collapsedThreads = DebugCommand.flag(value)
             default: throw AutomationError.failed("unknown setting \(name)")
             }
             return value

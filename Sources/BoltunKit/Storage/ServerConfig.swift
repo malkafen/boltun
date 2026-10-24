@@ -6,13 +6,15 @@ public struct ServerConfig: Codable, Hashable, Identifiable, Sendable {
     public var url: URL
     public var lastTeamId: String?
     public var lastChannelByTeam: [String: String]
+    public var teamLayout: TeamLayout
 
-    public init(id: UUID = UUID(), name: String, url: URL, lastTeamId: String? = nil, lastChannelByTeam: [String: String] = [:]) {
+    public init(id: UUID = UUID(), name: String, url: URL, lastTeamId: String? = nil, lastChannelByTeam: [String: String] = [:], teamLayout: TeamLayout = TeamLayout()) {
         self.id = id
         self.name = name
         self.url = url
         self.lastTeamId = lastTeamId
         self.lastChannelByTeam = lastChannelByTeam
+        self.teamLayout = teamLayout
     }
 
     public init(from decoder: Decoder) throws {
@@ -22,6 +24,7 @@ public struct ServerConfig: Codable, Hashable, Identifiable, Sendable {
         url = try c.decode(URL.self, forKey: .url)
         lastTeamId = c.optional(.lastTeamId)
         lastChannelByTeam = c.value(.lastChannelByTeam, default: [:])
+        teamLayout = c.value(.teamLayout, default: TeamLayout())
     }
 
     public var initials: String {
@@ -41,6 +44,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var downloadLocation: String?
     public var spellChecking = true
     public var fontScale: Double = 1.0
+    public var collapsedThreads = true
     public var lastServerId: UUID?
 
     public init() {}
@@ -57,6 +61,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
         downloadLocation = c.optional(.downloadLocation)
         spellChecking = c.value(.spellChecking, default: defaults.spellChecking)
         fontScale = c.value(.fontScale, default: defaults.fontScale)
+        collapsedThreads = c.value(.collapsedThreads, default: defaults.collapsedThreads)
         lastServerId = c.optional(.lastServerId)
     }
 }

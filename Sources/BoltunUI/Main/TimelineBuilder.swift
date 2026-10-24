@@ -18,6 +18,23 @@ struct ReactionChipModel: Equatable, Identifiable, Sendable {
     var userNames: [String]
 }
 
+struct ThreadParticipant: Equatable, Identifiable, Sendable {
+    var id: String
+    var name: String
+    var avatarURL: URL?
+}
+
+struct ThreadSummary: Equatable, Sendable {
+    static let maxParticipants = 3
+
+    var replyCount: Int
+    var participants: [ThreadParticipant]
+    var lastReplyText: String
+    var hasNewReplies: Bool
+
+    var replyText: String { replyCount == 1 ? "1 reply" : "\(replyCount) replies" }
+}
+
 struct MessageRowModel: Equatable, Identifiable {
     var id: String { post.id }
     var post: Post
@@ -29,6 +46,7 @@ struct MessageRowModel: Equatable, Identifiable {
     var isSystem: Bool
     var replyContext: ReplyContext?
     var replyCount: Int
+    var thread: ThreadSummary?
     var reactions: [ReactionChipModel]
     var timeText: String
     var fullTimeText: String
@@ -37,7 +55,7 @@ struct MessageRowModel: Equatable, Identifiable {
     static func == (lhs: MessageRowModel, rhs: MessageRowModel) -> Bool {
         lhs.post == rhs.post && lhs.authorName == rhs.authorName && lhs.avatarURL == rhs.avatarURL
             && lhs.isContinuation == rhs.isContinuation && lhs.isMine == rhs.isMine && lhs.mentionsMe == rhs.mentionsMe
-            && lhs.replyContext == rhs.replyContext && lhs.replyCount == rhs.replyCount && lhs.reactions == rhs.reactions
+            && lhs.replyContext == rhs.replyContext && lhs.replyCount == rhs.replyCount && lhs.thread == rhs.thread && lhs.reactions == rhs.reactions
             && lhs.timeText == rhs.timeText
     }
 }
@@ -66,10 +84,14 @@ struct TimelineContext {
     var now: Date = Date()
     var calendar: Calendar = .current
     var showReplyContext = true
+    var collapsedThreads = false
+    var openThreadId: String?
     var displayName: (Post) -> String = { $0.userId }
     var userName: (String) -> String = { $0 }
     var post: (String) -> Post? = { _ in nil }
     var avatarURL: (Post) -> URL? = { _ in nil }
+    var userAvatarURL: (String) -> URL? = { _ in nil }
+    var threadSeenAt: (String) -> Int64 = { _ in 0 }
     var customEmojiId: (String) -> String? = { _ in nil }
     var render: (Post) -> [MessageBlock] = { MessageRenderer.render($0.message) }
 }
@@ -137,11 +159,23 @@ enum TimelineBuilder {
             isSystem: post.isSystemMessage,
             replyContext: context.showReplyContext ? replyContext(for: post, previous: previous, context: context) : nil,
             replyCount: post.isReply ? 0 : post.replyCount,
+            thread: context.collapsedThreads ? threadSummary(for: post, context: context) : nil,
             reactions: reactions(for: post, context: context),
             timeText: TimeFormatting.time(date, calendar: context.calendar),
             fullTimeText: TimeFormatting.full(date, calendar: context.calendar),
             blocks: post.isDeleted ? [] : context.render(post)
         )
+    }
+
+    static func threadSummary(for post: Post, context: TimelineContext) -> ThreadSummary? {
+        guard !post.isReply, !post.isDeleted, post.replyCount > 0 else { return nil }
+        let participants = post.participantIds.reversed().prefix(ThreadSummary.maxParticipants).map { id in
+            ThreadParticipant(id: id, name: context.userName(id), avatarURL: context.userAvatarURL(id))
+        }
+        let lastReply = post.lastReplyAt > 0 ? "Last reply \(TimeFormatting.relative(post.lastReplyAt.mattermostDate, now: context.now, calendar: context.calendar))" : ""
+        let seenAt = max(context.lastViewedAt, context.threadSeenAt(post.id))
+        let hasNew = seenAt > 0 && post.lastReplyAt > seenAt && context.openThreadId != post.id
+        return ThreadSummary(replyCount: post.replyCount, participants: Array(participants), lastReplyText: lastReply, hasNewReplies: hasNew)
     }
 
     static func replyContext(for post: Post, previous: Post?, context: TimelineContext) -> ReplyContext? {

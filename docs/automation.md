@@ -50,7 +50,7 @@ From the Linux dev host, run the same commands through `ssh macbox@192.168.5.90`
 | `select?server=<index>[&team=<name>][&channel=<name>]` | Selects a server, and optionally a team and channel by name or display name. |
 | `open?url=<percent-encoded url>` | Routes a `mattermost://`, `boltun://` or `https://` link as if it was opened from outside. |
 | `remove-server?server=<index>` | Removes the server at the given index, as the Settings window does. |
-| `setting?name=spellChecking&value=0\|1` | Changes a preference. `spellChecking` is the only supported name. |
+| `setting?name=spellChecking\|collapsedThreads&value=0\|1` | Changes a preference: spell checking or collapsed reply threads. |
 | `present?sheet=add-server\|login\|browse\|dm[&server=<index>]` | Presents the add-server, login, browse-channels or direct-messages sheet. |
 | `dismiss` | Dismisses the current sheet. |
 | `settings[?tab=servers\|general\|about]` | Opens the Settings window on a tab. |
@@ -84,6 +84,8 @@ from the newest regular post, so `index=0` is the last one.
 | `leave` | Leaves the current channel. |
 | `favorite[?on=0]` | Adds the current channel to favorites, or removes it with `on=0`. |
 | `collapse?category=<title>[&collapsed=0]` | Collapses a sidebar category by title, or expands it with `collapsed=0`. `on` is accepted as an alias. |
+| `team-favorite?team=<name>[&on=0]` | Pins a team to the favorites above the divider in the team sidebar, or unpins it with `on=0`. The detail is the resulting team order. |
+| `team-move?team=<name>&to=<name>` | Moves a team onto another one, as dropping it there does. Use `end=favorites\|others` instead of `to` to move it to the end of a section. |
 | `link?url=<percent-encoded url>` | Handles a link as if it was clicked in a message, including permalinks and channel links. |
 | `notification-click?channel=<id>[&server=<index>][&team=<id>][&root=<id>]` | Routes a notification response the same way as clicking a delivered notification. |
 | `command?name=<name>[&number=<n>]` | Runs a menu or keyboard command, listed below. |
@@ -94,12 +96,12 @@ from the newest regular post, so `index=0` is the last one.
 
 ### UI state
 
-`state` also writes a `ui` object for the selected workspace. It includes the window title, first responder, open right
+`state` lists teams in sidebar order with `favoriteTeams`, and also writes a `ui` object for the selected workspace. It includes the window title, first responder, open right
 pane and thread posts, quick switcher and search results, the highlighted post, the scroll report (distances from
 the top and bottom, content height, unseen count for the new-messages pill, older-page requests), timeline size and paging flags, the last posts with reactions and files, both composers (text, editing post,
 suggestions, uploads, height), typing users, unread and mention channels, favorites, collapsed categories, open sheets,
-the last session error, the workspace and cached post counts, and `editors`, the spell-checking and font size of every
-live composer text view.
+the last session error, the workspace and cached post counts, `editors`, the spell-checking and font size of every
+live composer text view, and `collapsedThreads`. Post summaries carry `replyCount`.
 
 Output paths must be absolute and inside `/tmp` or `/private/tmp`; paths containing `..` and existing symbolic links
 are rejected.

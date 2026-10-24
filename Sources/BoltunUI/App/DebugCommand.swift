@@ -42,8 +42,16 @@ public enum DebugCommand: Equatable, Sendable {
     case leave
     case favorite(on: Bool)
     case collapse(category: String, collapsed: Bool)
+    case teamFavorite(team: String, on: Bool)
+    case teamMove(team: String, target: TeamMoveTarget)
     case link(url: URL)
     case notificationClick(server: Int, team: String, channel: String, root: String)
+
+    public enum TeamMoveTarget: Equatable, Sendable {
+        case team(String)
+        case endOfFavorites
+        case endOfOthers
+    }
 
     public static let host = "debug"
     public static let defaultsKey = "BoltunDebugAutomation"
@@ -160,6 +168,17 @@ public enum DebugCommand: Equatable, Sendable {
         case "collapse":
             guard let category = nonEmpty(query["category"]) else { return nil }
             return .collapse(category: category, collapsed: (query["collapsed"] ?? query["on"]).map(flag) ?? true)
+        case "team-favorite":
+            guard let team = nonEmpty(query["team"]) else { return nil }
+            return .teamFavorite(team: team, on: query["on"].map(flag) ?? true)
+        case "team-move":
+            guard let team = nonEmpty(query["team"]) else { return nil }
+            if let target = nonEmpty(query["to"]) { return .teamMove(team: team, target: .team(target)) }
+            switch query["end"] {
+            case "favorites": return .teamMove(team: team, target: .endOfFavorites)
+            case "others": return .teamMove(team: team, target: .endOfOthers)
+            default: return nil
+            }
         case "notification-click":
             guard let channel = nonEmpty(query["channel"]) else { return nil }
             return .notificationClick(server: index(query["server"]) ?? 0, team: query["team"] ?? "", channel: channel, root: query["root"] ?? "")

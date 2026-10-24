@@ -120,7 +120,9 @@ final class MockServer: @unchecked Sendable {
     }
 
     func page(channelId: String, query: [String: String]) -> [String: Any] {
+        let collapsed = query["collapsedThreads"] == "true"
         let all = lock.withLock { channelPosts[channelId] ?? [] }
+            .filter { !collapsed || ($0["root_id"] as? String ?? "").isEmpty }
             .sorted { ($0["create_at"] as! Int64) > ($1["create_at"] as! Int64) }
         if let since = query["since"].flatMap(Int64.init) {
             let changed = all.filter { post in

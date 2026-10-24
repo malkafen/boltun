@@ -10,6 +10,9 @@ struct TeamTileModel: Equatable, Identifiable {
     var unread: Bool
     var mentions: Int
     var iconURL: URL?
+    var favorite = false
+    var previousId: String?
+    var nextId: String?
 
     var shortcutLabel: String? { index < 9 ? "⌃⌘\(index + 1)" : nil }
 
@@ -19,8 +22,14 @@ struct TeamTileModel: Equatable, Identifiable {
 
     @MainActor
     static func make(session: ServerSession) -> [TeamTileModel] {
-        session.teams.enumerated().map { index, team in
+        let sections = session.teamSections
+        let favoriteIds = Set(sections.favorites.map(\.id))
+        let ordered = sections.all
+        return ordered.enumerated().map { index, team in
             let unread = session.teamUnread(teamId: team.id)
+            let favorite = favoriteIds.contains(team.id)
+            let section = favorite ? sections.favorites : sections.others
+            let position = section.firstIndex { $0.id == team.id } ?? 0
             return TeamTileModel(
                 id: team.id,
                 name: team.displayName.isEmpty ? team.name : team.displayName,
@@ -29,7 +38,10 @@ struct TeamTileModel: Equatable, Identifiable {
                 selected: team.id == session.currentTeamId,
                 unread: unread.unread,
                 mentions: unread.mentions,
-                iconURL: team.lastTeamIconUpdate > 0 ? session.client.teamIconURL(teamId: team.id, lastIconUpdate: team.lastTeamIconUpdate) : nil
+                iconURL: team.lastTeamIconUpdate > 0 ? session.client.teamIconURL(teamId: team.id, lastIconUpdate: team.lastTeamIconUpdate) : nil,
+                favorite: favorite,
+                previousId: position > 0 ? section[position - 1].id : nil,
+                nextId: position + 1 < section.count ? section[position + 1].id : nil
             )
         }
     }
@@ -48,12 +60,12 @@ extension ServerSession {
     }
 
     func switchTeam(number: Int) async {
-        guard let id = TeamNavigator.team(number: number, in: teams.map(\.id)) else { return }
+        guard let id = TeamNavigator.team(number: number, in: orderedTeams.map(\.id)) else { return }
         await switchTeam(id: id)
     }
 
     func cycleTeam(offset: Int) async {
-        guard let id = ChannelNavigator.adjacent(in: teams.map(\.id), from: currentTeamId, offset: offset) else { return }
+        guard let id = ChannelNavigator.adjacent(in: orderedTeams.map(\.id), from: currentTeamId, offset: offset) else { return }
         await switchTeam(id: id)
     }
 }
@@ -88,19 +100,117 @@ struct LeftRail: View {
 
 struct TeamList: View {
     let session: ServerSession
+    @State private var dragging: String?
 
     var body: some View {
+        let tiles = TeamTileModel.make(session: session)
+        let favorites = tiles.filter(\.favorite)
+        let others = tiles.filter { !$0.favorite }
         ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: 8) {
-                ForEach(TeamTileModel.make(session: session)) { tile in
-                    TeamTile(tile: tile, client: session.client) {
-                        Task { await session.switchTeam(id: tile.id) }
-                    }
-                    .equatable()
+                ForEach(favorites) { tile in row(tile) }
+                if !favorites.isEmpty {
+                    TeamSectionDivider()
+                        .onDrop(of: [.plainText], delegate: dropDelegate(.endOfFavorites))
                 }
+                ForEach(others) { tile in row(tile) }
+                Color.clear
+                    .frame(width: LeftRail.width, height: 44)
+                    .contentShape(Rectangle())
+                    .onDrop(of: [.plainText], delegate: dropDelegate(.endOfOthers))
             }
             .padding(.bottom, 12)
+            .animation(.easeOut(duration: 0.15), value: tiles.map(\.id))
+            .animation(.easeOut(duration: 0.15), value: favorites.count)
         }
+    }
+
+    func row(_ tile: TeamTileModel) -> some View {
+        TeamTile(tile: tile, client: session.client) {
+            dragging = nil
+            Task { await session.switchTeam(id: tile.id) }
+        }
+        .equatable()
+        .contextMenu { TeamTileMenu(tile: tile, session: session) }
+        .onDrag {
+            dragging = tile.id
+            return NSItemProvider(object: tile.id as NSString)
+        }
+        .onDrop(of: [.plainText], delegate: dropDelegate(.team(tile.id)))
+    }
+
+    func dropDelegate(_ target: TeamDropTarget) -> TeamDropDelegate {
+        TeamDropDelegate(target: target, session: session, dragging: $dragging)
+    }
+}
+
+struct TeamSectionDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(Theme.separator)
+            .frame(width: 32, height: 1)
+            .frame(width: LeftRail.width, height: 9)
+            .contentShape(Rectangle())
+    }
+}
+
+struct TeamTileMenu: View {
+    let tile: TeamTileModel
+    let session: ServerSession
+
+    var body: some View {
+        Button(tile.favorite ? "Remove from Favorites" : "Add to Favorites") {
+            session.setFavorite(teamId: tile.id, favorite: !tile.favorite)
+        }
+        if tile.previousId != nil || tile.nextId != nil {
+            Divider()
+        }
+        if let previous = tile.previousId {
+            Button("Move Up") { session.moveTeam(tile.id, to: previous) }
+        }
+        if let next = tile.nextId {
+            Button("Move Down") { session.moveTeam(tile.id, to: next) }
+        }
+    }
+}
+
+enum TeamDropTarget: Equatable {
+    case team(String)
+    case endOfFavorites
+    case endOfOthers
+}
+
+extension ServerSession {
+    func moveTeam(_ teamId: String, onto target: TeamDropTarget) {
+        switch target {
+        case .team(let targetId): moveTeam(teamId, to: targetId)
+        case .endOfFavorites: moveTeamToEnd(teamId, favorite: true)
+        case .endOfOthers: moveTeamToEnd(teamId, favorite: false)
+        }
+    }
+}
+
+struct TeamDropDelegate: DropDelegate {
+    let target: TeamDropTarget
+    let session: ServerSession
+    @Binding var dragging: String?
+
+    func validateDrop(info: DropInfo) -> Bool {
+        dragging != nil
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard let dragging, target != .team(dragging) else { return }
+        withAnimation(.easeOut(duration: 0.15)) { session.moveTeam(dragging, onto: target) }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        dragging = nil
+        return true
     }
 }
 

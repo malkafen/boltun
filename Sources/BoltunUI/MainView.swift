@@ -122,7 +122,7 @@ struct WorkspaceView: View {
         })
         .task(id: session.connection == .connected) {
             guard session.connection == .connected, session.currentTeamId == nil,
-                  let target = SelectionRestore.target(teams: session.teams, server: server)
+                  let target = SelectionRestore.target(teams: session.orderedTeams, server: server)
             else { return }
             await session.selectTeam(target.teamId, channelId: target.channelId)
         }

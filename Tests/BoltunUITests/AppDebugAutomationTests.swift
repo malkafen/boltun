@@ -173,6 +173,33 @@ struct AppDebugAutomationTests {
         #expect(host.terminated == 1)
     }
 
+    @Test func reordersTeamsAndTogglesCollapsedThreads() async throws {
+        let harness = await Harness.connected()
+        let (automation, _, sink, _) = make(harness)
+        await automation.handle(URL(string: "boltun://debug/team-move?team=team-two&to=team-one")!)
+        #expect(sink.lines.last == "ok /team-move team-two,team-one")
+        await automation.handle(URL(string: "boltun://debug/team-favorite?team=team-one")!)
+        #expect(sink.lines.last == "ok /team-favorite team-one,team-two")
+        await automation.handle(URL(string: "boltun://debug/team-move?team=team-two&end=favorites")!)
+        await automation.handle(URL(string: "boltun://debug/team-move?team=team-one&end=others")!)
+        #expect(sink.lines.last == "ok /team-move team-two,team-one")
+        await automation.handle(URL(string: "boltun://debug/team-favorite?team=nope")!)
+        #expect(sink.lines.last == "error /team-favorite no team nope")
+        await automation.handle(URL(string: "boltun://debug/team-move?team=team-one&to=nope")!)
+        #expect(sink.lines.last == "error /team-move no team nope")
+        let path = tempPath("teams.json")
+        await automation.handle(URL(string: "boltun://debug/state?path=\(path)")!)
+        let state = try JSONDecoder().decode(AutomationState.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+        try? FileManager.default.removeItem(atPath: path)
+        #expect(state.servers[0].teams == ["team-two", "team-one"])
+        #expect(state.servers[0].favoriteTeams == ["team-two"])
+        #expect(harness.model.servers[0].teamLayout.favorites.count == 1)
+        await automation.handle(URL(string: "boltun://debug/setting?name=collapsedThreads&value=0")!)
+        #expect(harness.model.settings.collapsedThreads == false)
+        await automation.handle(URL(string: "boltun://debug/setting?name=collapsedThreads&value=1")!)
+        #expect(harness.model.settings.collapsedThreads)
+    }
+
     @Test func refusesSymlinkTargets() throws {
         let target = tempPath("target")
         let link = tempPath("link.png")
