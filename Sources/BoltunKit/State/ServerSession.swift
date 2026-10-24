@@ -66,6 +66,8 @@ public final class ServerSession {
     public internal(set) var collapsedThreads = false
     public internal(set) var channelMemberCounts: [String: Int] = [:]
     public internal(set) var revealingPostIds: Set<String> = []
+    public internal(set) var readCounts: [String: [MemberReadCount]] = [:]
+    public internal(set) var readStatusEnabled = true
     public var teamLayout = TeamLayout() {
         didSet { if teamLayout != oldValue { onTeamLayoutChange?(teamLayout) } }
     }
@@ -82,6 +84,13 @@ public final class ServerSession {
     @ObservationIgnored public var presenceBatchLimit = 200
     @ObservationIgnored var presenceTask: Task<Void, Never>?
     @ObservationIgnored var burnOnReadTask: Task<Void, Never>?
+    @ObservationIgnored public var readStatusPollInterval: Duration = .seconds(30)
+    @ObservationIgnored public var readStatusMaxPollInterval: Duration = .seconds(120)
+    @ObservationIgnored var readStatusPollTask: Task<Void, Never>?
+    @ObservationIgnored var readStatusPollChannelId: String?
+    @ObservationIgnored var readStatusRefreshing = Set<String>()
+    @ObservationIgnored var readStatusQueued = Set<String>()
+    @ObservationIgnored var readStatusRestartPending = false
     @ObservationIgnored var requestedStatsChannelIds = Set<String>()
     @ObservationIgnored var requestedStatusIds = Set<String>()
     @ObservationIgnored let realtimeFactory: (URL, String) -> RealtimeClient
@@ -313,6 +322,7 @@ public final class ServerSession {
     func stopRealtime() {
         stopPresence()
         stopBurnOnReadExpiry()
+        stopReadStatusPolling()
         realtimeTask?.cancel()
         realtimeTask = nil
         if let realtime { Task { await realtime.stop() } }
@@ -444,6 +454,7 @@ public final class ServerSession {
             currentTeamId = channel.teamId
         }
         currentChannelId = channelId
+        if readStatusPollChannelId != channelId { stopReadStatusPolling() }
         manuallyUnread.remove(channelId)
         onSelectionChange?(currentTeamId, channelId)
         var timeline = timelines[channelId] ?? ChannelTimeline()
@@ -463,7 +474,9 @@ public final class ServerSession {
         }
         guard currentChannelId == channelId else { return }
         let previousChannel = previousId == channelId ? "" : (previousId ?? "")
-        await markViewed(channelId: channelId, previous: previousChannel)
+        async let viewed: Void = markViewed(channelId: channelId, previous: previousChannel)
+        async let readStatus: Void = refreshReadStatus(channelId: channelId, restartPolling: true)
+        _ = await (viewed, readStatus)
     }
 
     public func markViewed(channelId: String, previous: String = "") async {
@@ -674,6 +687,7 @@ public final class ServerSession {
             discardPending(pending.id)
             receive(post: post)
             if !rootId.isEmpty { markFollowing(threadId: rootId, true) }
+            ownPostCreated(channelId: channelId)
             return true
         } catch {
             discardPending(pending.id)
@@ -1003,9 +1017,10 @@ public final class ServerSession {
         }
         if !existed, var channel = channels[post.channelId] {
             channel.lastPostAt = max(channel.lastPostAt, post.createAt)
-            channel.totalMsgCount += 1
+            let counted = ReadStatus.countsTowardsTotal(post)
+            if counted { channel.totalMsgCount += 1 }
             if post.rootId.isEmpty {
-                channel.totalMsgCountRoot += 1
+                if counted { channel.totalMsgCountRoot += 1 }
                 channel.lastRootPostAt = max(channel.lastRootPostAt, post.createAt)
             }
             channels[post.channelId] = channel
@@ -1062,6 +1077,7 @@ public final class ServerSession {
     func removeChannelMembership(_ channelId: String) {
         members[channelId] = nil
         timelines[channelId] = nil
+        readCounts[channelId] = nil
         for (teamId, list) in categories {
             categories[teamId] = list.map { category in
                 var category = category

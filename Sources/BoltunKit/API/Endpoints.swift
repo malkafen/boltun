@@ -81,6 +81,10 @@ public extension APIClient {
         try await send(ChannelMember.self, .get, "channels/\(channelId)/members/me")
     }
 
+    func channelMemberReadCounts(channelId: String, perPage: Int = 200) async throws -> [MemberReadCount] {
+        try await send([MemberReadCount].self, .get, "channels/\(channelId)/members", query: ["page": "0", "per_page": String(perPage)])
+    }
+
     func channelStats(channelId: String) async throws -> ChannelStats {
         try await send(ChannelStats.self, .get, "channels/\(channelId)/stats")
     }

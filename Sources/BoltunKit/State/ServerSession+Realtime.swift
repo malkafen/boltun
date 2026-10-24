@@ -28,6 +28,7 @@ extension ServerSession {
                 await resync()
                 await refreshPresence()
             }
+            Task { await self.refreshVisibleReadStatus(restartPolling: true) }
         case .disconnected:
             guard connection != .unauthorized else { return }
             connection = .reconnecting
@@ -71,7 +72,9 @@ extension ServerSession {
             if let post = event.embedded(Post.self, "post") { removePost(post.id, fallback: post) }
         case WebSocketEventType.reactionAdded, WebSocketEventType.reactionRemoved:
             if let reaction = event.embedded(Reaction.self, "reaction") {
-                applyReaction(reaction, added: event.event == WebSocketEventType.reactionAdded)
+                let added = event.event == WebSocketEventType.reactionAdded
+                applyReaction(reaction, added: added)
+                if added { readStatusActivity(channelId: event.channelId, userId: reaction.userId) }
             }
         case WebSocketEventType.typing:
             handleTyping(event)
@@ -160,6 +163,7 @@ extension ServerSession {
 
     func handlePostEdited(_ event: WebSocketEvent) {
         guard let post = event.embedded(Post.self, "post"), !deletedPostIds.contains(post.id) else { return }
+        readStatusActivity(channelId: post.channelId, userId: post.userId)
         guard posts[post.id] != nil || timelines[post.channelId]?.loaded == true else { return }
         var merged = post
         if let old = posts[post.id] {
@@ -177,6 +181,7 @@ extension ServerSession {
         let key = typingKey(channelId: event.channelId, parentId: event.string("parent_id") ?? "")
         let stamp = now()
         typing[key, default: [:]][userId] = stamp
+        readStatusActivity(channelId: event.channelId, userId: userId)
         let timeout = typingTimeout
         Task { [weak self] in
             try? await Task.sleep(for: timeout)
@@ -217,6 +222,11 @@ extension ServerSession {
             teamUnreads[teamId] = unread
         }
         receive(post: post)
+        if post.userId == myId {
+            if isNew { ownPostCreated(channelId: post.channelId) }
+        } else {
+            readStatusActivity(channelId: post.channelId, userId: post.userId)
+        }
         applyFollowers(event, post: post, mentioned: mentioned)
         if event.data["set_online"]?.boolValue == true { markActive(userId: post.userId) }
         if channel == nil, teamId.isEmpty || loadedTeams.contains(teamId) {
