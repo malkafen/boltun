@@ -69,6 +69,12 @@ public enum PreferenceCategory {
     public static let favoriteChannel = "favorite_channel"
     public static let flaggedPost = "flagged_post"
     public static let theme = "theme"
+    public static let sidebarSettings = "sidebar_settings"
+}
+
+public enum PreferenceName {
+    public static let nameFormat = "name_format"
+    public static let limitVisibleDirectMessages = "limit_visible_dms_gms"
 }
 
 public struct ServerErrorBody: Codable, Hashable, Sendable {

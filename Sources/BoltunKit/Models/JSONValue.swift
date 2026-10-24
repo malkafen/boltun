@@ -40,7 +40,9 @@ public enum JSONValue: Codable, Hashable, Sendable {
     public var stringValue: String? {
         switch self {
         case .string(let value): return value
-        case .number(let value): return value == value.rounded() ? String(Int64(value)) : String(value)
+        case .number(let value):
+            if value == value.rounded(), let integer = Int64(exactly: value) { return String(integer) }
+            return String(value)
         case .bool(let value): return value ? "true" : "false"
         default: return nil
         }
@@ -63,7 +65,10 @@ public enum JSONValue: Codable, Hashable, Sendable {
         }
     }
 
-    public var intValue: Int? { doubleValue.map { Int($0) } }
+    public var intValue: Int? {
+        guard let value = doubleValue, value.isFinite, value > Double(Int.min), value < Double(Int.max) else { return nil }
+        return Int(value)
+    }
 
     public var arrayValue: [JSONValue]? {
         if case .array(let value) = self { return value }

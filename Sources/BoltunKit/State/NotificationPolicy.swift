@@ -32,7 +32,7 @@ public enum NotificationPolicy {
     ) -> Bool {
         guard post.userId != me.id, !post.isSystemMessage, !post.isDeleted else { return false }
         guard post.props["from_webhook"]?.boolValue != true || mentioned || channelType.isDirectOrGroup else { return false }
-        if myStatus == .dnd || isViewingChannel { return false }
+        if myStatus == .dnd || isViewingChannel || member?.isMuted == true { return false }
         let channelLevel = member?.desktopNotifyLevel ?? "default"
         let level = channelLevel == "default" ? (me.notifyProps["desktop"] ?? "mention") : channelLevel
         switch level {
@@ -41,7 +41,6 @@ public enum NotificationPolicy {
         case "none":
             return false
         default:
-            if member?.isMuted == true && !mentioned { return false }
             return mentioned || channelType.isDirectOrGroup
         }
     }

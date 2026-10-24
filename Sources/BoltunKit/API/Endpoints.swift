@@ -19,7 +19,8 @@ public extension APIClient {
     }
 
     func clientConfig() async throws -> ClientConfig {
-        ClientConfig(values: try await send([String: String].self, .get, "config/client", query: ["format": "old"]))
+        let raw = try await send(JSONObject.self, .get, "config/client", query: ["format": "old"])
+        return ClientConfig(values: raw.compactMapValues(\.stringValue))
     }
 
     func login(loginId: String, password: String, mfaToken: String? = nil) async throws -> LoginResult {
@@ -150,6 +151,11 @@ public extension APIClient {
 
     func pinPost(id: String, pinned: Bool) async throws {
         try await sendVoid(.post, "posts/\(id)/\(pinned ? "pin" : "unpin")")
+    }
+
+    @discardableResult
+    func markPostUnread(userId: String, postId: String) async throws -> ChannelMember {
+        try await send(ChannelMember.self, .post, "users/\(userId)/posts/\(postId)/set_unread", json: ["collapsed_threads_supported": false])
     }
 
     func addReaction(userId: String, postId: String, emojiName: String) async throws -> Reaction {
