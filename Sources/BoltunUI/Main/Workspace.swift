@@ -105,9 +105,9 @@ final class Workspace {
         self.session = session
         self.serverURL = serverURL
         channelToast = ChannelToastModel(session: session)
+        channelFiles = ChannelFilesModel { query, page in await session.searchChannelFiles(query, page: page) }
         channelToast.requestScroll = { [weak self] target in self?.requestScroll(target) }
         channelToast.now = { [weak self] in self?.now() ?? Date() }
-        channelFiles = ChannelFilesModel { query, page in await session.searchChannelFiles(query, page: page) }
     }
 
     func composer(for target: ComposerTarget) -> ComposerState {

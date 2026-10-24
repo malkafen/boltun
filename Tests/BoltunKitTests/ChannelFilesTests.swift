@@ -133,13 +133,14 @@ import Testing
     }}
     """#
 
-    @Test func searchesTheCurrentTeamAndLoadsSenders() async throws {
+    @Test func searchesTheCurrentTeamWithoutLoadingSenders() async throws {
         let server = MockServer()
         server.transport.on("POST", "teams/t1/files/search", json: Self.page)
         let session = await server.startedSession()
+        let userLookups = server.transport.count("POST", "users/ids")
         let files = await session.searchChannelFiles(ChannelFileQuery(channelId: "c-town", text: "b", filter: .documents), page: 1)
         #expect(files?.map(\.id) == ["f2", "f1"])
-        #expect(session.users["u3"]?.username == "carol")
+        #expect(server.transport.count("POST", "users/ids") == userLookups)
         let body = try #require(server.transport.last("POST", "teams/t1/files/search")).jsonObject
         #expect(body["terms"] as? String == "b channel:c-town ext:doc ext:pdf ext:docx ext:odt ext:rtf ext:txt")
         #expect(body["page"] as? Int == 1)

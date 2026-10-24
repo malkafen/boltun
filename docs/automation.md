@@ -164,7 +164,7 @@ paging), `searchVisible`, `search`, `searching`, `canLoadMore` and up to 80 `ite
 (the server allows file attachments, so the header button shows), `open`, `channelId`, `channel`, the section `title`
 (`Recent files` or `Search Results`), `filter` and `filterTitle`, the applied `query`, the search `terms` sent to the
 server, `loading`, `loadingMore`, `atEnd`, `nextPage`, `count`, the `empty` and `emptyDetail` texts when the empty state
-shows, the first 40 `files` (`id`, `name`, `kind`, `sender`, `size`, `date`, the `Direct Message`/`Group Message`
+shows, the first 40 `files` (`id`, `name`, `kind`, `size`, `date`, the `Direct Message`/`Group Message`
 `tag`, `postId` and whether a `thumbnail` image is used), `preparingPreviews` (file ids being fetched for Quick Look)
 and `quickLook`, the path shown in a visible Quick Look panel.
 

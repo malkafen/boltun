@@ -7,7 +7,6 @@ extension AutomationUIState {
             var id: String
             var name: String
             var kind: String
-            var sender: String
             var size: String
             var date: String
             var tag: String?
@@ -132,7 +131,6 @@ extension DebugAutomation {
                     id: file.id,
                     name: row.name,
                     kind: row.kind.rawValue,
-                    sender: row.sender,
                     size: row.sizeText,
                     date: row.dateText,
                     tag: row.channelTag,

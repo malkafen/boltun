@@ -89,7 +89,6 @@ struct AppChannelFilesAutomationTests {
         #expect(summary.files.map(\.name) == ["photo.png", "notes.txt", "orphan.bin"])
         #expect(summary.files[0].thumbnail)
         #expect(summary.files[1].size == "2 KB")
-        #expect(summary.files[1].sender == "boltun")
         #expect(summary.files[1].kind == "text")
         #expect(summary.quickLook == nil)
 

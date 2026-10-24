@@ -24,9 +24,7 @@ extension ServerSession {
     public func searchChannelFiles(_ query: ChannelFileQuery, page: Int) async -> [FileInfo]? {
         do {
             let results = try await client.searchFiles(teamId: currentTeamId, channelFilesRequest(query, page: page))
-            let files = results.orderedFiles
-            await ensureUsers(files.map(\.userId))
-            return files
+            return results.orderedFiles
         } catch {
             if APIError.wrap(error).isFileSearchDisabled { return [] }
             report(error)

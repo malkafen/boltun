@@ -143,13 +143,12 @@ struct ChannelFileRowModel: Equatable {
     var name: String
     var kind: FileKind
     var channelTag: String?
-    var sender: String
     var sizeText: String
     var dateText: String
     var hasPost: Bool
 
     var details: String {
-        [sender, sizeText, dateText].filter { !$0.isEmpty }.joined(separator: " • ")
+        [sizeText, dateText].filter { !$0.isEmpty }.joined(separator: " • ")
     }
 
     @MainActor
@@ -158,7 +157,6 @@ struct ChannelFileRowModel: Equatable {
         name = file.name
         kind = file.kind
         channelTag = Self.tag(for: session.channels[file.channelId]?.type)
-        sender = file.userId.isEmpty ? "" : session.displayName(userId: file.userId)
         sizeText = ChannelFileFormatting.size(file.size)
         dateText = ChannelFileFormatting.date(file.createAt.mattermostDate, now: now, calendar: calendar)
         hasPost = !file.postId.isEmpty
