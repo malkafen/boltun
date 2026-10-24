@@ -96,7 +96,7 @@ import Testing
     @Test func typingIndicatorsExpire() async {
         let server = MockServer()
         let session = await server.startedSession()
-        session.typingTimeout = .milliseconds(80)
+        session.typingTimeout = .seconds(1)
         session.apply(Fixtures.wsEvent("typing", data: ["user_id": "u2", "parent_id": ""], channel: "c-town"))
         session.apply(Fixtures.wsEvent("typing", data: ["user_id": "me1", "parent_id": ""], channel: "c-town"))
         session.apply(Fixtures.wsEvent("typing", data: ["user_id": "u3", "parent_id": "p5"], channel: "c-town"))

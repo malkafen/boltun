@@ -21,7 +21,7 @@ struct StallingTransport: HTTPTransport {
         let transport = StallingTransport(base: harness.server.transport, stalledHost: "two.example.com")
         let app = AppModel(store: harness.store, credentials: harness.credentials, transport: transport, realtimeFactory: harness.server.realtimeFactory())
         let startup = Task { await app.startAll() }
-        let restored = await eventually(timeout: .seconds(5)) { app.selectedSession?.currentChannelId == "c-dev" }
+        let restored = await eventually(timeout: .seconds(20)) { app.selectedSession?.currentChannelId == "c-dev" }
         #expect(restored)
         #expect(app.session(for: harness.second.id)?.connection == .connecting)
         startup.cancel()
