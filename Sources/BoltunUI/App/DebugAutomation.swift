@@ -192,6 +192,7 @@ public final class DebugAutomation {
             switch name {
             case "spellChecking": model.settings.spellChecking = DebugCommand.flag(value)
             case "collapsedThreads": model.settings.collapsedThreads = DebugCommand.flag(value)
+            case "showReadStatus": model.settings.showReadStatus = DebugCommand.flag(value)
             default: throw AutomationError.failed("unknown setting \(name)")
             }
             return value

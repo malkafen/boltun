@@ -50,7 +50,7 @@ From the Linux dev host, run the same commands through `ssh macbox@192.168.5.90`
 | `select?server=<index>[&team=<name>][&channel=<name>]` | Selects a server, and optionally a team and channel by name or display name. |
 | `open?url=<percent-encoded url>` | Routes a `mattermost://`, `boltun://` or `https://` link as if it was opened from outside. |
 | `remove-server?server=<index>` | Removes the server at the given index, as the Settings window does. |
-| `setting?name=spellChecking\|collapsedThreads&value=0\|1` | Changes a preference: spell checking or collapsed reply threads. |
+| `setting?name=spellChecking\|collapsedThreads\|showReadStatus&value=0\|1` | Changes a preference: spell checking, collapsed reply threads or the read status of your direct and group messages. |
 | `present?sheet=add-server\|login\|browse\|dm\|notifications[&server=<index>]` | Presents the add-server, login, browse-channels, direct-messages or channel notification preferences sheet. |
 | `dismiss` | Dismisses the current sheet. |
 | `settings[?tab=servers\|general\|about]` | Opens the Settings window on a tab. |
@@ -120,6 +120,22 @@ Message read information is reported too. `readInfo` names the server-side gatin
 `burnOnRead` with `isSender`, `revealed`, `expireAt`, `readBy` and `recipients`. Both composers report `priority`,
 `requestedAck`, `persistentNotifications` and `burnOnRead`. The burn-on-read confirmation shows up in `sheets` as
 `burn-confirmation`.
+
+The read status of your own messages in direct and group messages is reported as well. Post summaries in `recentPosts`
+carry `readStatus` (`sent`, `seen` or `partially-seen/<other members>`, absent for other people's posts, pending posts,
+burn-on-read posts and channels that are not tracked), `seenBy` (display names of the members who have seen the post)
+and `readIndicator`, which is true for the posts that show checkmarks in the message list. The `readStatus` object of
+`ui` describes the current channel: `enabled` (the "Show read status" setting), `tracked` (a direct or group message
+that is followed), `polling` (whether the slow refresh is running because a message is still unseen), `total` (the
+channel's message count, root posts only with collapsed threads) and `unseenByMember` (how many of the latest counted
+posts each other member has not seen).
+
+Mattermost has no read receipts, so Boltun compares the channel's `total_msg_count` with each member's `msg_count`
+(the `_root` variants with collapsed threads). The counts are fetched when the channel opens, after you post, when the
+other member posts, types, reacts or edits in the channel, when the app or its main window becomes active and after the
+WebSocket reconnects. To check the status from a script, change the counts on the server (for example
+`POST /api/v4/channels/members/me/view` as the other user), trigger a refresh, for instance by reacting to a post as
+that user with `POST /api/v4/reactions` or by selecting the channel again, then read `state`.
 
 Output paths must be absolute and inside `/tmp` or `/private/tmp`; paths containing `..` and existing symbolic links
 are rejected.
