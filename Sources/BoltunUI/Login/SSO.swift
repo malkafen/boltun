@@ -1,6 +1,7 @@
 import AuthenticationServices
 import BoltunKit
 import Foundation
+import Synchronization
 
 public enum SSOProvider: String, CaseIterable, Hashable, Sendable, Identifiable {
     case gitlab
@@ -110,28 +111,52 @@ public final class SystemWebAuthenticator: NSObject, WebAuthenticating, ASWebAut
     public override init() {}
 
     public func authenticate(url: URL, callbackScheme: String) async throws -> URL {
-        try await withCheckedThrowingContinuation { continuation in
-            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme) { callback, error in
-                if let callback {
-                    continuation.resume(returning: callback)
-                } else if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
-                    continuation.resume(throwing: SSOError.cancelled)
-                } else {
-                    continuation.resume(throwing: SSOError.failed(error?.localizedDescription ?? "Sign-in failed."))
-                }
-            }
+        defer { session = nil }
+        return try await withCheckedThrowingContinuation { continuation in
+            let gate = WebAuthenticationGate(continuation)
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme, completionHandler: Self.completionHandler(gate))
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = false
             self.session = session
             if !session.start() {
-                continuation.resume(throwing: SSOError.failed("Could not start the sign-in session."))
+                gate.resume(with: .failure(.failed("Could not start the sign-in session.")))
             }
         }
+    }
+
+    nonisolated static func completionHandler(_ gate: WebAuthenticationGate) -> @Sendable (URL?, (any Error)?) -> Void {
+        { callback, error in gate.resume(with: result(callback: callback, error: error)) }
+    }
+
+    nonisolated static func result(callback: URL?, error: (any Error)?) -> Result<URL, SSOError> {
+        if let callback {
+            return .success(callback)
+        }
+        if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+            return .failure(.cancelled)
+        }
+        return .failure(.failed(error?.localizedDescription ?? "Sign-in failed."))
     }
 
     nonisolated public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         MainActor.assumeIsolated {
             NSApp.keyWindow ?? NSApp.windows.first { $0.isVisible } ?? ASPresentationAnchor()
         }
+    }
+}
+
+final class WebAuthenticationGate: Sendable {
+    private let continuation: Mutex<CheckedContinuation<URL, any Error>?>
+
+    init(_ continuation: CheckedContinuation<URL, any Error>) {
+        self.continuation = Mutex(continuation)
+    }
+
+    func resume(with result: Result<URL, SSOError>) {
+        let pending = continuation.withLock { value -> CheckedContinuation<URL, any Error>? in
+            defer { value = nil }
+            return value
+        }
+        pending?.resume(with: result.mapError { $0 as any Error })
     }
 }
