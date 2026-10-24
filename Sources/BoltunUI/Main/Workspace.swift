@@ -90,9 +90,14 @@ final class Workspace {
     @ObservationIgnored var openExternal: (URL) -> Void = { NSWorkspace.shared.open($0) }
     @ObservationIgnored var revealInFinder: (URL) -> Void = { NSWorkspace.shared.activateFileViewerSelecting([$0]) }
 
+    let channelToast: ChannelToastModel
+
     init(session: ServerSession, serverURL: URL) {
         self.session = session
         self.serverURL = serverURL
+        channelToast = ChannelToastModel(session: session)
+        channelToast.requestScroll = { [weak self] target in self?.requestScroll(target) }
+        channelToast.now = { [weak self] in self?.now() ?? Date() }
     }
 
     func composer(for target: ComposerTarget) -> ComposerState {

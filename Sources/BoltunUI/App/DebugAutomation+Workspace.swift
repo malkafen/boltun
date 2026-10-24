@@ -52,6 +52,15 @@ struct AutomationUIState: Codable, Equatable, Sendable {
         var burnOnRead = false
     }
 
+    struct ToastSummary: Codable, Equatable, Sendable {
+        var kind: String
+        var message: String
+        var action: String?
+        var showActions: Bool
+        var count: Int
+        var since: Int64
+    }
+
     struct ReadInfoFeatures: Codable, Equatable, Sendable {
         var postPriority: Bool
         var acknowledgements: Bool
@@ -93,6 +102,8 @@ struct AutomationUIState: Codable, Equatable, Sendable {
     var readInfo: ReadInfoFeatures?
     var readStatus: ReadStatusTracking?
     var sidebar: [SidebarCategorySummary] = []
+    var toast: ToastSummary?
+    var lastViewedAtOnOpen: Int64 = 0
 
     struct Editor: Codable, Equatable, Sendable {
         var spellChecking: Bool
@@ -289,9 +300,38 @@ extension DebugAutomation {
             return session.orderedTeams.map(\.name).joined(separator: ",")
         case .channelMove, .categoryMove, .categorySort:
             return try await performSidebarOrder(command, session: session)
+        case .toast(let action):
+            return try performToast(action, workspace: workspace)
         default:
             throw AutomationError.invalidCommand
         }
+    }
+
+    func performToast(_ action: DebugCommand.ToastAction, workspace: Workspace) throws -> String {
+        let model = workspace.channelToast
+        guard model.channelId != nil, model.channelId == workspace.session.currentChannelId else { throw AutomationError.failed("no toast") }
+        switch action {
+        case .jump:
+            guard model.jump() else { throw AutomationError.failed("no toast") }
+        case .dismiss:
+            guard model.dismiss() else { throw AutomationError.failed("no toast") }
+        case .escape:
+            model.escape()
+        }
+        return model.visible?.kind.rawValue ?? "none"
+    }
+
+    static func toastSummary(_ workspace: Workspace) -> AutomationUIState.ToastSummary? {
+        let model = workspace.channelToast
+        guard model.channelId == workspace.session.currentChannelId, let toast = model.visible else { return nil }
+        return AutomationUIState.ToastSummary(
+            kind: toast.kind.rawValue,
+            message: ChannelToastText.message(for: toast, width: model.width, now: workspace.now(), calendar: workspace.calendar),
+            action: toast.showActions && (toast.kind == .scrollToBottom || model.width.showsActionTitle) ? toast.actionTitle : nil,
+            showActions: toast.showActions,
+            count: toast.count,
+            since: toast.since
+        )
     }
 
     func team(named name: String, in session: ServerSession) throws -> Team {
@@ -432,7 +472,9 @@ extension DebugAutomation {
                 licenseSku: session.license.skuShortName
             ),
             readStatus: Self.readStatusTracking(session: session, channelId: channelId),
-            sidebar: Self.sidebarSummary(session)
+            sidebar: Self.sidebarSummary(session),
+            toast: Self.toastSummary(workspace),
+            lastViewedAtOnOpen: timeline.lastViewedAtOnOpen
         )
     }
 

@@ -77,6 +77,7 @@ from the newest regular post, so `index=0` is the last one.
 | `open-thread[?index=<n>][&post=<id>]` | Opens the thread of a post in the right pane. |
 | `close-pane` | Closes the right pane. |
 | `scroll?to=top\|bottom\|<post id>` | Scrolls the message list to an edge, or centers and highlights a post. |
+| `toast?action=jump\|dismiss\|escape` | Acts on the message list toast: `jump` clicks it (Jump to recents, Jump to new messages or Jump to unreads), `dismiss` clicks its close button and `escape` presses Esc in the window. The detail is the kind of toast shown afterwards, or `none`. Fails with `no toast` when nothing is shown for `jump` and `dismiss`. |
 | `quickswitch[?query=<text>][&choose=1][&close=1]` | Opens the quick switcher with a query; `choose=1` opens the first result and `close=1` hides it. |
 | `search?q=<terms>` | Runs a message search. The detail is the number of results. |
 | `jump[?index=<n>]` | Jumps to a search result. |
@@ -111,13 +112,26 @@ from the newest regular post, so `index=0` is the last one.
 
 `state` lists teams in sidebar order with `favoriteTeams` and `mutedTeams`, and also writes a `ui` object for the selected workspace. It includes the window title, first responder, open right
 pane and thread posts, quick switcher and search results, the highlighted post, the scroll report (distances from
-the top and bottom, content height, unseen count for the new-messages pill, older-page requests), timeline size and paging flags, the last posts with reactions and files, both composers (text, editing post,
+the top and bottom, content and container height, older-page requests and the unread positioning described below), timeline size and paging flags, the last posts with reactions and files, both composers (text, editing post,
 suggestions, uploads, height), typing users, unread and mention channels, favorites, `mutedChannels`, collapsed categories, open sheets,
 the last session error, the workspace and cached post counts, `editors`, the spell-checking and font size of every
 live composer text view, `collapsedThreads`, `myStatus` and `threadFollowing` for the open thread. Post summaries carry
 `replyCount`, the author's `status` and, for root posts, `following`. `sidebar` lists the channel sidebar categories in
 order with their `id`, `title`, `type`, effective `sorting` (`alpha`, `recent` or `manual`), `collapsed` flag and the
 display names of their `channels` in sidebar order.
+
+Unread positioning and the message list toast follow the Mattermost webapp. When a channel opens with unread posts, the
+list is positioned so that the "New Messages" separator (or the date line directly above it) sits 50 points below the
+top, leaving room for the toast, instead of starting at the bottom. With the `advanced_settings` /
+`unread_scroll_position` preference set to `start_from_newest` the list starts at the bottom and offers "Jump to
+unreads" instead. The scroll report carries `initialTarget` (`bottom`, or the id of the item aligned to the top),
+`positioned` (true once the initial or focus positioning has settled) and `newMessagesLineTop` (the separator's offset
+from the top of the visible area while it is rendered). `lastViewedAtOnOpen` is the last-viewed time captured when the
+channel opened, which places the separator and is moved forward when new posts arrive while scrolled up. `toast` is
+absent when no toast is shown; otherwise it has `kind` (`unread`, `unreadWithBottomStart`, `newMessages`, `history` or
+`scrollToBottom`), the rendered `message` (for example `60 new messages today`), the visible `action` label (absent when
+the list is narrower than 769 points or the toast is passive at the bottom), `showActions`, `count` and `since` (the
+last-viewed time in milliseconds).
 
 Message read information is reported too. `readInfo` names the server-side gating (`postPriority`,
 `acknowledgements`, `persistentNotifications`, `burnOnRead` and the `licenseSku` they come from). Post summaries carry

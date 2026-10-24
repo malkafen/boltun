@@ -8,8 +8,20 @@ struct TimelineItemView: View {
     let workspace: Workspace
     var inThread = false
     var highlightedPostId: String?
+    var onFrame: ((String, CGRect?) -> Void)?
 
     var body: some View {
+        if let onFrame {
+            content
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .scrollView) } action: { [id = item.id] in onFrame(id, $0) }
+                .onDisappear { [id = item.id] in onFrame(id, nil) }
+        } else {
+            content
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         switch item {
         case .date(let title):
             DateSeparator(title: title)

@@ -231,8 +231,6 @@ struct MainSnapshotTests {
                 CountBadge(count: 7)
                 Banner(style: .warning, text: "Warning banner", actionTitle: "Act", action: {})
                 Banner(style: .error, text: "Error banner", onDismiss: {})
-                NewMessagesPill(count: 1) {}
-                NewMessagesPill(count: 5) {}
                 FileChip(file: FileInfo(id: "f", name: "archive.zip", extension: "zip", size: 2048), isDownloading: true) {}
                 UploadChip(upload: PendingUpload(filename: "x.png", size: 10, state: .failed)) {}
                 IconButton(systemName: "star", help: "Star") {}
