@@ -19,7 +19,7 @@ public struct MainView: View {
 
     public var body: some View {
         HStack(spacing: 0) {
-            ServerRail(model: model, onAddServer: onAddServer)
+            LeftRail(model: model, onAddServer: onAddServer)
             Rectangle().fill(Color.black.opacity(0.35)).frame(width: 1)
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -192,6 +192,13 @@ struct WorkspaceShortcuts: View {
             HiddenShortcut(key: .downArrow, modifiers: [.option, .command]) { Task { await workspace.navigate(offset: 1) } }
             HiddenShortcut(key: .upArrow, modifiers: [.option, .shift]) { Task { await workspace.navigateUnread(forward: false) } }
             HiddenShortcut(key: .downArrow, modifiers: [.option, .shift]) { Task { await workspace.navigateUnread(forward: true) } }
+            HiddenShortcut(key: .upArrow, modifiers: [.control, .command]) { Task { await workspace.session.cycleTeam(offset: -1) } }
+            HiddenShortcut(key: .downArrow, modifiers: [.control, .command]) { Task { await workspace.session.cycleTeam(offset: 1) } }
+            ForEach(1...9, id: \.self) { number in
+                HiddenShortcut(key: KeyEquivalent(Character(String(number))), modifiers: [.control, .command]) {
+                    Task { await workspace.session.switchTeam(number: number) }
+                }
+            }
         }
     }
 }

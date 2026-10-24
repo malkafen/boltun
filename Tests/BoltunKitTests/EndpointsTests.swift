@@ -298,5 +298,6 @@ import Testing
         #expect(client.profileImageURL(userId: "u", lastPictureUpdate: 12).absoluteString == "https://chat.example.com/api/v4/users/u/image?_=12")
         #expect(client.customEmojiImageURL(id: "e").absoluteString == "https://chat.example.com/api/v4/emoji/e/image")
         #expect(client.teamIconURL(teamId: "t").absoluteString == "https://chat.example.com/api/v4/teams/t/image")
+        #expect(client.teamIconURL(teamId: "t", lastIconUpdate: 7).absoluteString == "https://chat.example.com/api/v4/teams/t/image?_=7")
     }
 }

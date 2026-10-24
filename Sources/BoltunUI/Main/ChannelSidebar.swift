@@ -72,7 +72,6 @@ struct ChannelSidebar: View {
         let rows = Dictionary(uniqueKeysWithValues: sections.flatMap(\.channelIds).compactMap { id in SidebarRowModel.make(channelId: id, session: session).map { (id, $0) } })
         VStack(spacing: 0) {
             SidebarHeader(workspace: workspace)
-            if session.teams.count > 1 { TeamStrip(workspace: workspace) }
             FindChannelButton { workspace.openQuickSwitcher() }
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
@@ -141,34 +140,39 @@ extension Workspace {
 
 struct SidebarHeader: View {
     let workspace: Workspace
+    @Environment(\.appRouter) private var router
 
     var body: some View {
         let session = workspace.session
         HStack(spacing: 8) {
             Menu {
-                ForEach(session.teams) { team in
-                    let unread = session.teamUnread(teamId: team.id)
-                    Button {
-                        Task { await session.selectTeam(team.id) }
-                    } label: {
-                        Text(TeamMenuLabel.text(name: team.displayName, unread: unread, current: team.id == session.currentTeamId))
-                    }
+                if let router {
+                    ServerMenuItems(model: router.model, onAddServer: router.presentAddServer)
                 }
             } label: {
-                HStack(spacing: 5) {
-                    Text(session.currentTeam?.displayName ?? "Boltun")
-                        .scaledFont(15, weight: .bold)
-                        .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(1)
-                    Image(systemName: "chevron.down")
-                        .scaledFont(10, weight: .bold)
-                        .foregroundStyle(Theme.textSecondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 5) {
+                        Text(session.currentTeam?.displayName ?? "Boltun")
+                            .scaledFont(15, weight: .bold)
+                            .foregroundStyle(Theme.textPrimary)
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .scaledFont(10, weight: .bold)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                    if let serverName = router?.model.selectedServer?.name {
+                        Text(serverName)
+                            .scaledFont(11)
+                            .foregroundStyle(Theme.textSecondary)
+                            .lineLimit(1)
+                    }
                 }
             }
             .menuStyle(.button)
             .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
+            .help("Switch servers")
             Spacer(minLength: 4)
             Menu {
                 Button("Browse Channels") { workspace.showBrowseChannels = true }
@@ -188,55 +192,6 @@ struct SidebarHeader: View {
         }
         .padding(.horizontal, 14)
         .frame(height: 52)
-    }
-}
-
-enum TeamMenuLabel {
-    static func text(name: String, unread: ChannelUnread, current: Bool) -> String {
-        var label = current ? "✓ \(name)" : name
-        if unread.mentions > 0 {
-            label += "  (\(BadgeText.count(unread.mentions)))"
-        } else if unread.unread {
-            label += "  •"
-        }
-        return label
-    }
-}
-
-struct TeamStrip: View {
-    let workspace: Workspace
-
-    var body: some View {
-        let session = workspace.session
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(session.teams) { team in
-                    let unread = session.teamUnread(teamId: team.id)
-                    let selected = team.id == session.currentTeamId
-                    Button {
-                        Task { await session.selectTeam(team.id) }
-                    } label: {
-                        RoundedRectangle(cornerRadius: 7)
-                            .fill(selected ? Theme.railTileSelected : Theme.railTile)
-                            .frame(width: 30, height: 30)
-                            .overlay(Text(team.initials).scaledFont(11, weight: .bold).foregroundStyle(.white))
-                            .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(selected ? Color.white.opacity(0.85) : .clear, lineWidth: 2).padding(-3))
-                            .overlay(alignment: .topTrailing) {
-                                if unread.mentions > 0 && !selected {
-                                    CountBadge(count: unread.mentions).scaleEffect(0.8).offset(x: 9, y: -7)
-                                } else if unread.unread && !selected {
-                                    Circle().fill(.white).frame(width: 7, height: 7).offset(x: 3, y: -3)
-                                }
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .help(team.displayName)
-                }
-            }
-            .padding(.horizontal, 15)
-            .padding(.vertical, 6)
-        }
-        .padding(.bottom, 6)
     }
 }
 
