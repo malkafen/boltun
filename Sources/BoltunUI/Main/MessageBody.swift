@@ -20,6 +20,9 @@ struct BlockView: View {
     let block: MessageBlock
     let client: APIClient?
     var scale: Double = 1
+    @Environment(\.fontScale) private var fontScale
+
+    var effectiveScale: Double { scale * fontScale }
 
     static func headingSize(level: Int) -> CGFloat {
         let sizes: [CGFloat] = [22, 19, 17, 15, 14, 13.5]
@@ -29,21 +32,21 @@ struct BlockView: View {
     var body: some View {
         switch block {
         case .paragraph(let text):
-            Text(text)
-                .font(Theme.messageFont(scale: scale))
+            Text(InlineCodeStyle.apply(text, scale: effectiveScale))
+                .font(Theme.messageFont(scale: effectiveScale))
                 .foregroundStyle(Theme.textPrimary)
                 .lineSpacing(2)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
         case .heading(let level, let text):
-            Text(text)
-                .font(.system(size: Self.headingSize(level: level) * scale, weight: .semibold))
+            Text(InlineCodeStyle.apply(text, scale: effectiveScale))
+                .font(.system(size: Self.headingSize(level: level) * effectiveScale, weight: .semibold))
                 .foregroundStyle(Theme.textPrimary)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 2)
         case .code(let language, let code):
-            CodeBlockView(language: language, code: code, scale: scale)
+            CodeBlockView(language: language, code: code, scale: effectiveScale)
         case .quote(let blocks):
             HStack(alignment: .top, spacing: 10) {
                 RoundedRectangle(cornerRadius: 1.5).fill(Theme.quoteBar).frame(width: 3)
@@ -56,7 +59,7 @@ struct BlockView: View {
                 ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(ordered ? "\(start + index)." : "•")
-                            .font(Theme.messageFont(scale: scale))
+                            .font(Theme.messageFont(scale: effectiveScale))
                             .monospacedDigit()
                             .foregroundStyle(Theme.textSecondary)
                             .frame(minWidth: 16, alignment: .trailing)
@@ -65,7 +68,7 @@ struct BlockView: View {
                 }
             }
         case .table(let header, let rows):
-            TableBlockView(header: header, rows: rows, scale: scale)
+            TableBlockView(header: header, rows: rows, scale: effectiveScale)
         case .thematicBreak:
             Rectangle().fill(Theme.border).frame(height: 1).padding(.vertical, 4)
         case .image(let url, let alt):
@@ -80,6 +83,20 @@ struct BlockView: View {
     }
 }
 
+enum InlineCodeStyle {
+    static func apply(_ text: AttributedString, scale: Double) -> AttributedString {
+        let ranges = text.runs.compactMap { run in run.inlinePresentationIntent?.contains(.code) == true ? run.range : nil }
+        guard !ranges.isEmpty else { return text }
+        var styled = text
+        for range in ranges {
+            styled[range].font = Theme.codeFont(scale: scale)
+            styled[range].backgroundColor = Theme.inlineCodeBackground
+            styled[range].foregroundColor = Theme.inlineCodeText
+        }
+        return styled
+    }
+}
+
 struct CodeBlockView: View {
     let language: String?
     let code: String
@@ -89,7 +106,7 @@ struct CodeBlockView: View {
         VStack(alignment: .leading, spacing: 0) {
             if let language, !language.isEmpty {
                 Text(language)
-                    .font(.system(size: 10.5, weight: .semibold))
+                    .scaledFont(10.5, weight: .semibold)
                     .foregroundStyle(Theme.textSecondary)
                     .padding(.horizontal, 10)
                     .padding(.top, 6)
@@ -136,7 +153,7 @@ struct TableBlockView: View {
     }
 
     func cellView(_ text: AttributedString, bold: Bool) -> some View {
-        Text(text)
+        Text(InlineCodeStyle.apply(text, scale: scale))
             .font(.system(size: 13 * scale, weight: bold ? .semibold : .regular))
             .foregroundStyle(Theme.textPrimary)
             .textSelection(.enabled)

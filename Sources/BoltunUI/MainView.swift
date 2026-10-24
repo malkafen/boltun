@@ -1,3 +1,4 @@
+import AppKit
 import BoltunKit
 import SwiftUI
 
@@ -5,7 +6,10 @@ public struct MainView: View {
     let model: AppModel
     let onAddServer: () -> Void
     let onLogin: (UUID) -> Void
-    @State private var registry = WorkspaceRegistry()
+    @Environment(\.appRouter) private var router
+    @State private var localRegistry = WorkspaceRegistry()
+
+    var registry: WorkspaceRegistry { router?.workspaces ?? localRegistry }
 
     public init(model: AppModel, onAddServer: @escaping () -> Void = {}, onLogin: @escaping (UUID) -> Void = { _ in }) {
         self.model = model
@@ -21,9 +25,11 @@ public struct MainView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Theme.content)
+        .background { WindowTitleView(model: model) }
         .frame(minWidth: 860, minHeight: 520)
         .preferredColorScheme(.dark)
         .tint(Theme.accent)
+        .onChange(of: model.servers.map(\.id)) { _, ids in registry.prune(keeping: Set(ids)) }
     }
 
     @ViewBuilder var content: some View {
@@ -33,7 +39,7 @@ public struct MainView: View {
             if model.needsLogin.contains(server.id) {
                 LoginPlaceholder(serverName: server.name, serverURL: server.url) { onLogin(server.id) }
             } else if let session = model.session(for: server.id) {
-                WorkspaceView(workspace: registry.workspace(for: session, serverURL: server.url))
+                WorkspaceView(workspace: registry.workspace(for: session, serverURL: server.url), server: server)
                     .id(ObjectIdentifier(session))
             } else {
                 ConnectingView(serverName: server.name)
@@ -57,11 +63,20 @@ final class WorkspaceRegistry {
         return workspace
     }
 
+    func existing(serverId: UUID) -> Workspace? {
+        workspaces[serverId]
+    }
+
+    func prune(keeping ids: Set<UUID>) {
+        workspaces = workspaces.filter { ids.contains($0.key) }
+    }
+
     var count: Int { workspaces.count }
 }
 
 struct WorkspaceView: View {
     @Bindable var workspace: Workspace
+    var server: ServerConfig?
     @Environment(\.appRouter) private var router
     @State private var sidebarWidth: CGFloat = 250
     @State private var paneWidth: CGFloat = 400
@@ -70,9 +85,12 @@ struct WorkspaceView: View {
         let session = workspace.session
         HStack(spacing: 0) {
             if router?.isSidebarVisible ?? true {
-                ChannelSidebar(workspace: workspace)
-                    .frame(width: sidebarWidth)
-                ResizeHandle(width: $sidebarWidth, range: 200...380, direction: 1)
+                HStack(spacing: 0) {
+                    ChannelSidebar(workspace: workspace)
+                        .frame(width: sidebarWidth)
+                    ResizeHandle(width: $sidebarWidth, range: 200...380, direction: 1)
+                }
+                .transition(.move(edge: .leading).combined(with: .opacity))
             }
             ChannelView(workspace: workspace)
                 .frame(minWidth: 380)
@@ -102,21 +120,66 @@ struct WorkspaceView: View {
             return .handled
         })
         .task(id: session.connection == .connected) {
-            if session.connection == .connected, session.currentTeamId == nil, let first = session.teams.first {
-                await session.selectTeam(first.id)
-            }
+            guard session.connection == .connected, session.currentTeamId == nil,
+                  let target = SelectionRestore.target(teams: session.teams, server: server)
+            else { return }
+            await session.selectTeam(target.teamId, channelId: target.channelId)
         }
-        .task { await consumePendingRoute() }
+        .task { await workspace.consumePendingRoute(router) }
         .onChange(of: router?.lastCommand) { _, event in
             guard let event else { return }
             Task { await workspace.perform(event.command, router: router) }
         }
+        .onChange(of: workspace.rightPane != nil, initial: true) { _, visible in
+            if router?.isThreadPaneVisible != visible { router?.isThreadPaneVisible = visible }
+        }
+    }
+}
+
+struct WindowTitleView: View {
+    let model: AppModel
+
+    var body: some View {
+        WindowTitleSetter(title: WindowTitle.text(model: model))
+            .frame(width: 0, height: 0)
+    }
+}
+
+enum WindowTitle {
+    @MainActor
+    static func text(model: AppModel) -> String {
+        guard let server = model.selectedServer else { return "Boltun" }
+        guard let session = model.session(for: server.id), let channel = session.currentChannel else { return server.name }
+        return "\(session.displayName(channel: channel)) — \(server.name)"
+    }
+}
+
+struct WindowTitleSetter: NSViewRepresentable {
+    let title: String
+
+    final class TitleView: NSView {
+        var title = "" {
+            didSet { apply() }
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            apply()
+        }
+
+        func apply() {
+            if let window, window.title != title { window.title = title }
+        }
     }
 
-    private func consumePendingRoute() async {
-        if let rootId = router?.consumePendingThreadRootId() {
-            await workspace.openThread(rootId: rootId)
-        }
+    func makeNSView(context: Context) -> TitleView {
+        let view = TitleView()
+        view.title = title
+        return view
+    }
+
+    func updateNSView(_ view: TitleView, context: Context) {
+        view.title = title
     }
 }
 
@@ -125,7 +188,6 @@ struct WorkspaceShortcuts: View {
 
     var body: some View {
         ZStack {
-            HiddenShortcut(key: "k", modifiers: .command) { workspace.showQuickSwitcher.toggle() }
             HiddenShortcut(key: .upArrow, modifiers: [.option, .command]) { Task { await workspace.navigate(offset: -1) } }
             HiddenShortcut(key: .downArrow, modifiers: [.option, .command]) { Task { await workspace.navigate(offset: 1) } }
             HiddenShortcut(key: .upArrow, modifiers: [.option, .shift]) { Task { await workspace.navigateUnread(forward: false) } }
@@ -229,5 +291,13 @@ struct ConnectingView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.content)
+    }
+}
+
+enum SelectionRestore {
+    static func target(teams: [Team], server: ServerConfig?) -> (teamId: String, channelId: String?)? {
+        let remembered = server?.lastTeamId.flatMap { id in teams.contains { $0.id == id } ? id : nil }
+        guard let teamId = remembered ?? teams.first?.id else { return nil }
+        return (teamId, server?.lastChannelByTeam[teamId])
     }
 }

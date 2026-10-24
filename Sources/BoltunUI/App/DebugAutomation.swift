@@ -31,6 +31,7 @@ public struct AutomationState: Codable, Equatable, Sendable {
     public var pendingThreadRootId: String?
     public var fontScale: Double
     public var lastRouteError: String?
+    var ui: AutomationUIState?
 
     @MainActor
     public init(model: AppModel, router: AppRouter, windowVisible: Bool) {
@@ -90,6 +91,7 @@ public protocol AutomationHost: AnyObject {
     var mainWindow: NSWindow? { get }
     func showMainWindow()
     func deliverTestNotification(title: String, body: String) async
+    func activateNotification(_ route: NotificationRoute) async
     func terminate()
 }
 
@@ -160,7 +162,13 @@ public final class DebugAutomation {
             try Snapshot.write(data, to: path)
             return path
         case .addServer(let url, let name):
-            let (resolved, config) = try await model.validate(url: url)
+            let resolved: URL
+            let config: ClientConfig
+            do {
+                (resolved, config) = try await model.validate(url: url)
+            } catch {
+                throw AutomationError.failed(AddServerViewModel.describe(error))
+            }
             let server = model.addServer(name: name ?? config.siteName, url: resolved)
             await model.select(serverId: server.id)
             return server.id.uuidString
@@ -172,6 +180,16 @@ public final class DebugAutomation {
         case .logout(let index):
             await model.logout(serverId: try server(at: index).id)
             return ""
+        case .removeServer(let index):
+            let server = try server(at: index)
+            await model.removeServer(server.id)
+            return server.id.uuidString
+        case .setting(let name, let value):
+            switch name {
+            case "spellChecking": model.settings.spellChecking = DebugCommand.flag(value)
+            default: throw AutomationError.failed("unknown setting \(name)")
+            }
+            return value
         case .select(let index, let team, let channel):
             let server = try server(at: index)
             await model.select(serverId: server.id)
@@ -184,7 +202,8 @@ public final class DebugAutomation {
         case .open(let url):
             return await router.open(url: url) ? "" : (router.lastRouteError ?? "not routed")
         case .state(let path):
-            let state = AutomationState(model: model, router: router, windowVisible: host?.mainWindow?.isVisible ?? false)
+            var state = AutomationState(model: model, router: router, windowVisible: host?.mainWindow?.isVisible ?? false)
+            state.ui = uiState()
             try Snapshot.write(try state.json(), to: path)
             return path
         case .present(let sheet, let index):
@@ -193,6 +212,10 @@ public final class DebugAutomation {
                 router.presentAddServer()
             case "login":
                 router.presentLogin(serverId: try server(at: index ?? router.selectedIndex ?? 0).id)
+            case "browse":
+                try currentWorkspace().showBrowseChannels = true
+            case "dm":
+                try currentWorkspace().showDirectMessages = true
             default:
                 throw AutomationError.invalidCommand
             }
@@ -215,6 +238,11 @@ public final class DebugAutomation {
         case .quit:
             host?.terminate()
             return ""
+        case .notificationClick(let index, let team, let channel, let root):
+            await host?.activateNotification(NotificationRoute(serverId: try server(at: index).id, teamId: team, channelId: channel, rootId: root))
+            return ""
+        default:
+            return try await performInteraction(command)
         }
     }
 

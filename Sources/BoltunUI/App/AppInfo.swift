@@ -39,5 +39,6 @@ public struct AppInfo: Equatable, Sendable {
 
 extension EnvironmentValues {
     @Entry public var fontScale: Double = 1.0
+    @Entry public var spellChecking: Bool = true
     @Entry public var appRouter: AppRouter? = nil
 }

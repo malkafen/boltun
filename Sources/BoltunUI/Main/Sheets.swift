@@ -19,7 +19,7 @@ struct BrowseChannelsSheet: View {
         let session = workspace.session
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Browse Channels").font(.system(size: 17, weight: .bold))
+                Text("Browse Channels").scaledFont(17, weight: .bold)
                 Spacer()
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
             }
@@ -31,9 +31,9 @@ struct BrowseChannelsSheet: View {
                     HStack(alignment: .top, spacing: 10) {
                         Image(systemName: "globe").foregroundStyle(Theme.textSecondary).padding(.top, 2)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(channel.displayName).font(.system(size: 13.5, weight: .semibold))
+                            Text(channel.displayName).scaledFont(13.5, weight: .semibold)
                             if !channel.purpose.isEmpty {
-                                Text(channel.purpose).font(.system(size: 12)).foregroundStyle(Theme.textSecondary).lineLimit(2)
+                                Text(channel.purpose).scaledFont(12).foregroundStyle(Theme.textSecondary).lineLimit(2)
                             }
                         }
                         Spacer()
@@ -71,7 +71,7 @@ struct DirectMessageSheet: View {
         let session = workspace.session
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Direct Messages").font(.system(size: 17, weight: .bold))
+                Text("Direct Messages").scaledFont(17, weight: .bold)
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
             }
@@ -84,9 +84,9 @@ struct DirectMessageSheet: View {
                     HStack(spacing: 10) {
                         Avatar(url: session.client.profileImageURL(userId: user.id, lastPictureUpdate: user.lastPictureUpdate), client: session.client, name: user.username, size: 28, status: session.statuses[user.id])
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("@\(user.username)").font(.system(size: 13.5, weight: .semibold))
+                            Text("@\(user.username)").scaledFont(13.5, weight: .semibold)
                             if !user.fullName.isEmpty {
-                                Text(user.fullName).font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
+                                Text(user.fullName).scaledFont(12).foregroundStyle(Theme.textSecondary)
                             }
                         }
                         Spacer()
@@ -120,8 +120,8 @@ struct ImagePreviewSheet: View {
         let client = workspace.session.client
         VStack(spacing: 12) {
             HStack {
-                Text(file.name).font(.system(size: 14, weight: .semibold)).lineLimit(1)
-                Text(FileSizeText.text(file.size)).font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
+                Text(file.name).scaledFont(14, weight: .semibold).lineLimit(1)
+                Text(FileSizeText.text(file.size)).scaledFont(12).foregroundStyle(Theme.textSecondary)
                 Spacer()
                 Button("Download") { Task { await workspace.download(file) } }
                     .disabled(workspace.downloading.contains(file.id))

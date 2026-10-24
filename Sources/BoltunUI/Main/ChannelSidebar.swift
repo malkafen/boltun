@@ -73,7 +73,7 @@ struct ChannelSidebar: View {
         VStack(spacing: 0) {
             SidebarHeader(workspace: workspace)
             if session.teams.count > 1 { TeamStrip(workspace: workspace) }
-            FindChannelButton { workspace.showQuickSwitcher = true }
+            FindChannelButton { workspace.openQuickSwitcher() }
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
             ScrollView {
@@ -157,11 +157,11 @@ struct SidebarHeader: View {
             } label: {
                 HStack(spacing: 5) {
                     Text(session.currentTeam?.displayName ?? "Boltun")
-                        .font(.system(size: 15, weight: .bold))
+                        .scaledFont(15, weight: .bold)
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
+                        .scaledFont(10, weight: .bold)
                         .foregroundStyle(Theme.textSecondary)
                 }
             }
@@ -175,7 +175,7 @@ struct SidebarHeader: View {
                 Button("New Direct Message") { workspace.showDirectMessages = true }
             } label: {
                 Image(systemName: "square.and.pencil")
-                    .font(.system(size: 13, weight: .semibold))
+                    .scaledFont(13, weight: .semibold)
                     .foregroundStyle(Theme.textPrimary)
                     .frame(width: 28, height: 28)
                     .background(Circle().fill(Color.white.opacity(0.08)))
@@ -219,7 +219,7 @@ struct TeamStrip: View {
                         RoundedRectangle(cornerRadius: 7)
                             .fill(selected ? Theme.railTileSelected : Theme.railTile)
                             .frame(width: 30, height: 30)
-                            .overlay(Text(team.initials).font(.system(size: 11, weight: .bold)).foregroundStyle(.white))
+                            .overlay(Text(team.initials).scaledFont(11, weight: .bold).foregroundStyle(.white))
                             .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(selected ? Color.white.opacity(0.85) : .clear, lineWidth: 2).padding(-3))
                             .overlay(alignment: .topTrailing) {
                                 if unread.mentions > 0 && !selected {
@@ -246,10 +246,10 @@ struct FindChannelButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 7) {
-                Image(systemName: "magnifyingglass").font(.system(size: 11, weight: .semibold))
-                Text("Find channel").font(.system(size: 12.5))
+                Image(systemName: "magnifyingglass").scaledFont(11, weight: .semibold)
+                Text("Find channel").scaledFont(12.5)
                 Spacer()
-                Text("⌘K").font(.system(size: 11, weight: .medium)).opacity(0.7)
+                Text("⌘K").scaledFont(11, weight: .medium).opacity(0.7)
             }
             .foregroundStyle(Theme.sidebarText)
             .padding(.horizontal, 10)
@@ -271,17 +271,17 @@ struct SidebarSectionHeader: View {
     var body: some View {
         HStack(spacing: 5) {
             Image(systemName: "chevron.down")
-                .font(.system(size: 8.5, weight: .bold))
+                .scaledFont(8.5, weight: .bold)
                 .rotationEffect(.degrees(section.collapsed ? -90 : 0))
                 .frame(width: 10)
             Text(section.title.uppercased())
-                .font(.system(size: 11, weight: .semibold))
+                .scaledFont(11, weight: .semibold)
                 .tracking(0.3)
                 .lineLimit(1)
             Spacer()
             if hovering && (section.type == .directMessages || section.type == .channels) {
                 Button(action: onAdd) {
-                    Image(systemName: "plus").font(.system(size: 11, weight: .semibold))
+                    Image(systemName: "plus").scaledFont(11, weight: .semibold)
                 }
                 .buttonStyle(.plain)
                 .help(section.type == .directMessages ? "Write a direct message" : "Browse channels")
@@ -315,7 +315,7 @@ struct SidebarRow: View, Equatable {
             HStack(spacing: 8) {
                 icon.frame(width: 20, height: 20)
                 Text(row.title)
-                    .font(.system(size: 13.5, weight: emphasized && !row.selected ? .semibold : .regular))
+                    .scaledFont(13.5, weight: emphasized && !row.selected ? .semibold : .regular)
                     .foregroundStyle(emphasized ? Theme.sidebarTextUnread : Theme.sidebarText)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -326,7 +326,7 @@ struct SidebarRow: View, Equatable {
             }
             .padding(.leading, 16)
             .padding(.trailing, 14)
-            .frame(height: 30)
+            .frame(minHeight: 30)
             .background(background)
             .overlay(alignment: .leading) {
                 if row.selected { Rectangle().fill(Theme.accent).frame(width: 3) }
@@ -346,12 +346,12 @@ struct SidebarRow: View, Equatable {
     @ViewBuilder var icon: some View {
         let tint = emphasized ? Theme.sidebarTextUnread : Theme.sidebarText.opacity(0.8)
         switch row.icon {
-        case .open: Image(systemName: "globe").font(.system(size: 12.5)).foregroundStyle(tint)
-        case .private: Image(systemName: "lock.fill").font(.system(size: 12)).foregroundStyle(tint)
-        case .archived: Image(systemName: "archivebox").font(.system(size: 12)).foregroundStyle(tint)
+        case .open: Image(systemName: "globe").scaledFont(12.5).foregroundStyle(tint)
+        case .private: Image(systemName: "lock.fill").scaledFont(12).foregroundStyle(tint)
+        case .archived: Image(systemName: "archivebox").scaledFont(12).foregroundStyle(tint)
         case .group:
             Text("\(row.title.split(separator: ",").count)")
-                .font(.system(size: 10.5, weight: .bold))
+                .scaledFont(10.5, weight: .bold)
                 .foregroundStyle(tint)
                 .frame(width: 18, height: 18)
                 .background(RoundedRectangle(cornerRadius: 4).fill(Color.white.opacity(0.14)))

@@ -34,11 +34,12 @@ final class ComposerState {
     private(set) var suggestions: [AutocompleteSuggestion] = []
     var selectedIndex = 0
     private(set) var query: AutocompleteQuery?
-    private(set) var isSending = false
+    private(set) var pendingSends = 0
     private(set) var focusRevision = 0
     var editorHeight: CGFloat = 20
 
     @ObservationIgnored private var suggestionTask: Task<Void, Never>?
+    @ObservationIgnored private var sendChain: Task<Void, Never>?
     @ObservationIgnored private var draftBeforeEdit = ""
     @ObservationIgnored var debounce: Duration = .milliseconds(90)
 
@@ -62,7 +63,7 @@ final class ComposerState {
     var uploadedFileIds: [String] { uploads.compactMap { $0.fileInfo?.id } }
 
     var canSend: Bool {
-        guard !isSending, !isOverLimit, !isUploading else { return false }
+        guard !isOverLimit, !isUploading else { return false }
         if editingPostId != nil { return !trimmedText.isEmpty }
         return !trimmedText.isEmpty || !uploadedFileIds.isEmpty
     }
@@ -104,7 +105,7 @@ final class ComposerState {
     func perform(_ command: ComposerCommand) -> Bool {
         switch command {
         case .send:
-            Task { await send() }
+            submit()
             return true
         case .insertNewline, .passThrough:
             return false
@@ -130,29 +131,48 @@ final class ComposerState {
     }
 
     func send() async {
-        guard canSend else { return }
+        await submit()?.value
+    }
+
+    @discardableResult
+    func submit() -> Task<Void, Never>? {
+        guard canSend else { return nil }
         let message = trimmedText
-        isSending = true
-        defer { isSending = false }
+        let operation: @MainActor () async -> Void
         if let postId = editingPostId {
             let restore = text
-            replaceText(draftBeforeEdit)
+            let draft = draftBeforeEdit
+            replaceText(draft)
             editingPostId = nil
-            if !(await session.edit(postId: postId, message: message)) {
-                editingPostId = postId
-                replaceText(restore)
+            draftBeforeEdit = ""
+            operation = { [weak self] in
+                guard let self, !(await self.session.edit(postId: postId, message: message)) else { return }
+                guard self.editingPostId == nil, self.text == draft else { return }
+                self.draftBeforeEdit = draft
+                self.editingPostId = postId
+                self.replaceText(restore)
             }
-            return
+        } else {
+            let fileIds = uploadedFileIds
+            let previousText = text
+            let previousUploads = uploads
+            replaceText("")
+            uploads = []
+            operation = { [weak self] in
+                guard let self, !(await self.session.send(message, channelId: self.target.channelId, rootId: self.target.rootId, fileIds: fileIds)) else { return }
+                self.replaceText(self.text.isEmpty ? previousText : self.text + "\n" + previousText)
+                self.uploads += previousUploads
+            }
         }
-        let fileIds = uploadedFileIds
-        let previousText = text
-        let previousUploads = uploads
-        replaceText("")
-        uploads = []
-        if !(await session.send(message, channelId: target.channelId, rootId: target.rootId, fileIds: fileIds)) {
-            replaceText(previousText)
-            uploads = previousUploads
+        let previous = sendChain
+        pendingSends += 1
+        let task = Task { @MainActor [weak self] in
+            await previous?.value
+            await operation()
+            self?.pendingSends -= 1
         }
+        sendChain = task
+        return task
     }
 
     func lastOwnPost() -> Post? {

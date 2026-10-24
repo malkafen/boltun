@@ -93,6 +93,7 @@ public final class NotificationCoordinator {
     let center: NotificationPosting
     let dock: DockControlling
     private(set) var authorization: Bool?
+    var onDeliver: ((MentionNotification) -> Void)?
 
     public init(model: AppModel, router: AppRouter, center: NotificationPosting, dock: DockControlling) {
         self.model = model
@@ -116,6 +117,7 @@ public final class NotificationCoordinator {
     }
 
     public func deliver(_ notification: MentionNotification) async {
+        onDeliver?(notification)
         if model.settings.bounceDockIcon, !dock.isAppActive { dock.requestAttention() }
         guard model.settings.notificationsEnabled else { return }
         if authorization == nil { authorization = await center.requestAuthorization() }

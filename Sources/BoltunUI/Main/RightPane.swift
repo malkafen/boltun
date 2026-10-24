@@ -24,9 +24,9 @@ struct PaneHeader: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Text(title).font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.textPrimary)
+            Text(title).scaledFont(15, weight: .bold).foregroundStyle(Theme.textPrimary)
             if !subtitle.isEmpty {
-                Text(subtitle).font(.system(size: 12)).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                Text(subtitle).scaledFont(12).foregroundStyle(Theme.textSecondary).lineLimit(1)
             }
             Spacer()
             IconButton(systemName: "xmark", help: "Close", action: onClose)
@@ -59,7 +59,7 @@ struct ThreadPane: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(items) { item in
-                            TimelineItemView(item: item, workspace: workspace, inThread: true)
+                            TimelineItemView(item: item, workspace: workspace, inThread: true, highlightedPostId: workspace.highlightedPostId)
                         }
                     }
                     .padding(.vertical, 8)
@@ -87,7 +87,7 @@ struct SearchPane: View {
                 ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if workspace.searchResults.isEmpty {
                 VStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass").font(.system(size: 28)).foregroundStyle(Theme.textSecondary)
+                    Image(systemName: "magnifyingglass").scaledFont(28).foregroundStyle(Theme.textSecondary)
                     Text("No results for “\(workspace.searchQuery)”").foregroundStyle(Theme.textSecondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -120,17 +120,17 @@ struct SearchResultRow: View {
                 HStack(spacing: 4) {
                     if let channel { ChannelGlyph(channel: channel, session: session, size: 10) }
                     Text(channel.map { session.displayName(channel: $0) } ?? "Unknown channel")
-                        .font(.system(size: 11, weight: .semibold))
+                        .scaledFont(11, weight: .semibold)
                         .foregroundStyle(Theme.textSecondary)
                     Spacer()
                     Text(TimeFormatting.short(post.createAt.mattermostDate, now: workspace.now(), calendar: workspace.calendar))
-                        .font(.system(size: 11))
+                        .scaledFont(11)
                         .foregroundStyle(Theme.textSecondary)
                 }
                 HStack(alignment: .top, spacing: 8) {
                     Avatar(url: session.client.profileImageURL(userId: post.userId, lastPictureUpdate: session.users[post.userId]?.lastPictureUpdate ?? 0), client: session.client, name: session.displayName(for: post), size: 28)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(session.displayName(for: post)).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.textPrimary)
+                        Text(session.displayName(for: post)).scaledFont(13, weight: .semibold).foregroundStyle(Theme.textPrimary)
                         MessageBody(blocks: blocks, client: session.client)
                             .lineLimit(6)
                     }
@@ -149,13 +149,12 @@ struct SearchResultRow: View {
 }
 
 struct QuickSwitcherView: View {
-    let workspace: Workspace
-    @State private var query = ""
+    @Bindable var workspace: Workspace
     @State private var selection = 0
     @FocusState private var focused: Bool
 
     var body: some View {
-        let results = QuickSwitcher.results(workspace.quickSwitchItems(), query: query)
+        let results = QuickSwitcher.results(workspace.quickSwitchItems(), query: workspace.quickSwitcherQuery)
         ZStack(alignment: .top) {
             Theme.overlayDim
                 .ignoresSafeArea()
@@ -163,9 +162,9 @@ struct QuickSwitcherView: View {
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Theme.textSecondary)
-                    TextField("Find channels and direct messages", text: $query)
+                    TextField("Find channels and direct messages", text: $workspace.quickSwitcherQuery)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 16))
+                        .scaledFont(16)
                         .focused($focused)
                         .onSubmit { choose(results) }
                         .onKeyPress(.downArrow) { move(1, count: results.count); return .handled }
@@ -200,7 +199,7 @@ struct QuickSwitcherView: View {
                     Text("↵ to select")
                     Text("esc to dismiss")
                 }
-                .font(.system(size: 11))
+                .scaledFont(11)
                 .foregroundStyle(Theme.textSecondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
@@ -214,7 +213,7 @@ struct QuickSwitcherView: View {
             .padding(.top, 90)
         }
         .onAppear { focused = true }
-        .onChange(of: query) { selection = 0 }
+        .onChange(of: workspace.quickSwitcherQuery) { selection = 0 }
     }
 
     func move(_ delta: Int, count: Int) {
@@ -248,19 +247,19 @@ struct QuickSwitchRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: icon).font(.system(size: 12)).foregroundStyle(Theme.textSecondary).frame(width: 18)
+            Image(systemName: icon).scaledFont(12).foregroundStyle(Theme.textSecondary).frame(width: 18)
             Text(item.title)
-                .font(.system(size: 14, weight: item.unread ? .semibold : .regular))
+                .scaledFont(14, weight: item.unread ? .semibold : .regular)
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(1)
             if !item.subtitle.isEmpty {
-                Text(item.subtitle).font(.system(size: 12)).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                Text(item.subtitle).scaledFont(12).foregroundStyle(Theme.textSecondary).lineLimit(1)
             }
             Spacer()
             if item.mentions > 0 { CountBadge(count: item.mentions) }
         }
         .padding(.horizontal, 16)
-        .frame(height: 34)
+        .frame(minHeight: 34)
         .background(selected ? Theme.accent.opacity(0.28) : .clear)
     }
 }

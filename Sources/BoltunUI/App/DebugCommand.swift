@@ -12,6 +12,8 @@ public enum DebugCommand: Equatable, Sendable {
     case addServer(url: String, name: String?)
     case login(server: Int, user: String, password: String)
     case logout(server: Int)
+    case removeServer(server: Int)
+    case setting(name: String, value: String)
     case select(server: Int, team: String?, channel: String?)
     case open(url: URL)
     case state(path: String)
@@ -22,6 +24,26 @@ public enum DebugCommand: Equatable, Sendable {
     case close
     case notify(title: String, body: String)
     case quit
+    case send(text: String, thread: Bool)
+    case type(text: String, thread: Bool)
+    case key(name: String, modifiers: String, thread: Bool)
+    case openThread(index: Int, postId: String?)
+    case closePane
+    case react(index: Int, emoji: String)
+    case editLast(text: String)
+    case deleteLast
+    case scroll(to: String)
+    case quickSwitch(query: String, choose: Bool, close: Bool)
+    case search(query: String)
+    case jump(index: Int)
+    case command(name: String, number: Int?)
+    case upload(path: String, thread: Bool)
+    case join(channel: String)
+    case leave
+    case favorite(on: Bool)
+    case collapse(category: String, collapsed: Bool)
+    case link(url: URL)
+    case notificationClick(server: Int, team: String, channel: String, root: String)
 
     public static let host = "debug"
     public static let defaultsKey = "BoltunDebugAutomation"
@@ -55,6 +77,12 @@ public enum DebugCommand: Equatable, Sendable {
             return .login(server: index(query["server"]) ?? 0, user: user, password: password)
         case "logout":
             return .logout(server: index(query["server"]) ?? 0)
+        case "remove-server":
+            guard let server = index(query["server"]) else { return nil }
+            return .removeServer(server: server)
+        case "setting":
+            guard let name = nonEmpty(query["name"]), let value = query["value"] else { return nil }
+            return .setting(name: name, value: value)
         case "select":
             return .select(server: index(query["server"]) ?? 0, team: nonEmpty(query["team"]), channel: nonEmpty(query["channel"]))
         case "open":
@@ -79,8 +107,73 @@ public enum DebugCommand: Equatable, Sendable {
         case "quit":
             return .quit
         default:
+            return makeInteraction(action: action, query: query)
+        }
+    }
+
+    static func makeInteraction(action: String, query: [String: String]) -> DebugCommand? {
+        let thread = flag(query["thread"])
+        switch action {
+        case "send":
+            guard let text = nonEmpty(query["text"]) else { return nil }
+            return .send(text: text, thread: thread)
+        case "type":
+            return .type(text: query["text"] ?? "", thread: thread)
+        case "key":
+            guard let name = nonEmpty(query["name"]), ["enter", "up", "down", "tab", "escape"].contains(name) else { return nil }
+            return .key(name: name, modifiers: query["mods"] ?? "", thread: thread)
+        case "open-thread":
+            return .openThread(index: index(query["index"]) ?? 0, postId: nonEmpty(query["post"]))
+        case "close-pane":
+            return .closePane
+        case "react":
+            guard let emoji = nonEmpty(query["emoji"]) else { return nil }
+            return .react(index: index(query["index"]) ?? 0, emoji: emoji)
+        case "edit-last":
+            guard let text = nonEmpty(query["text"]) else { return nil }
+            return .editLast(text: text)
+        case "delete-last":
+            return .deleteLast
+        case "scroll":
+            guard let target = nonEmpty(query["to"]) else { return nil }
+            return .scroll(to: target)
+        case "quickswitch":
+            return .quickSwitch(query: query["query"] ?? "", choose: flag(query["choose"]), close: flag(query["close"]))
+        case "search":
+            guard let terms = nonEmpty(query["q"]) else { return nil }
+            return .search(query: terms)
+        case "jump":
+            return .jump(index: index(query["index"]) ?? 0)
+        case "command":
+            guard let name = nonEmpty(query["name"]) else { return nil }
+            return .command(name: name, number: index(query["number"]))
+        case "upload":
+            guard let path = query["path"].flatMap(allowedPath) else { return nil }
+            return .upload(path: path, thread: thread)
+        case "join":
+            guard let channel = nonEmpty(query["channel"]) else { return nil }
+            return .join(channel: channel)
+        case "leave":
+            return .leave
+        case "favorite":
+            return .favorite(on: query["on"].map(flag) ?? true)
+        case "collapse":
+            guard let category = nonEmpty(query["category"]) else { return nil }
+            return .collapse(category: category, collapsed: (query["collapsed"] ?? query["on"]).map(flag) ?? true)
+        case "notification-click":
+            guard let channel = nonEmpty(query["channel"]) else { return nil }
+            return .notificationClick(server: index(query["server"]) ?? 0, team: query["team"] ?? "", channel: channel, root: query["root"] ?? "")
+        case "link":
+            guard let url = query["url"].flatMap(URL.init(string:)), url.scheme != nil else { return nil }
+            return .link(url: url)
+        default:
             return nil
         }
+    }
+
+    static func flag(_ value: String?) -> Bool {
+        guard let value else { return false }
+        return ["1", "true", "yes", "on"].contains(value.lowercased())
     }
 
     public static func allowedPath(_ raw: String) -> String? {

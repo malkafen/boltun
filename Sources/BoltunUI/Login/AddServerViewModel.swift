@@ -79,6 +79,8 @@ public final class AddServerViewModel {
             return "Enter a valid server URL, for example https://chat.example.com."
         case .server(let status, _) where status == 404:
             return "No Mattermost server was found at this address."
+        case .server(_, nil):
+            return "No Mattermost server was found at this address."
         case .decoding, .invalidResponse:
             return "This address does not look like a Mattermost server."
         case let other:

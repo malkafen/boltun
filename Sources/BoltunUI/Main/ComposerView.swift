@@ -18,7 +18,7 @@ struct ComposerView: View {
                     Spacer()
                     Button("Cancel") { state.cancelEdit() }.buttonStyle(.plain).foregroundStyle(Theme.link)
                 }
-                .font(.system(size: 11.5))
+                .scaledFont(11.5)
                 .foregroundStyle(Theme.warning)
                 .padding(.horizontal, 4)
                 .padding(.bottom, 5)
@@ -38,7 +38,7 @@ struct ComposerView: View {
                         .frame(height: state.editorHeight)
                     if state.text.isEmpty {
                         Text(placeholder)
-                            .font(.system(size: 13.5))
+                            .scaledFont(13.5)
                             .foregroundStyle(Theme.textSecondary)
                             .lineLimit(1)
                             .allowsHitTesting(false)
@@ -57,15 +57,15 @@ struct ComposerView: View {
                     Spacer()
                     if state.showsLimit {
                         Text("\(state.remaining)")
-                            .font(.system(size: 11, weight: .medium))
+                            .scaledFont(11, weight: .medium)
                             .monospacedDigit()
                             .foregroundStyle(state.isOverLimit ? Theme.mention : Theme.textSecondary)
                             .help("Maximum \(state.maxLength) characters")
                             .padding(.trailing, 6)
                     }
-                    Button { Task { await state.send() } } label: {
+                    Button { state.submit() } label: {
                         Image(systemName: state.editingPostId == nil ? "paperplane.fill" : "checkmark")
-                            .font(.system(size: 12, weight: .semibold))
+                            .scaledFont(12, weight: .semibold)
                             .foregroundStyle(state.canSend ? .white : Theme.textSecondary)
                             .frame(width: 32, height: 26)
                             .background(RoundedRectangle(cornerRadius: 5).fill(state.canSend ? Theme.accent : Color.white.opacity(0.06)))
@@ -123,9 +123,9 @@ struct UploadChip: View {
             }
             .frame(width: 18)
             VStack(alignment: .leading, spacing: 0) {
-                Text(upload.filename).font(.system(size: 12, weight: .semibold)).lineLimit(1).truncationMode(.middle)
+                Text(upload.filename).scaledFont(12, weight: .semibold).lineLimit(1).truncationMode(.middle)
                 Text(upload.state == .failed ? "Upload failed" : upload.state == .uploading ? "Uploading…" : FileSizeText.text(upload.size))
-                    .font(.system(size: 10.5))
+                    .scaledFont(10.5)
                     .foregroundStyle(upload.state == .failed ? Theme.mention : Theme.textSecondary)
             }
             .frame(maxWidth: 160, alignment: .leading)
@@ -149,7 +149,7 @@ struct AutocompletePopup: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
-                .font(.system(size: 10.5, weight: .semibold))
+                .scaledFont(10.5, weight: .semibold)
                 .foregroundStyle(Theme.textSecondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
@@ -202,12 +202,12 @@ struct AutocompletePopup: View {
                 EmojiGlyphView(name: suggestion.title.trimmingCharacters(in: CharacterSet(charactersIn: ":")), glyph: suggestion.glyph, customEmojiId: suggestion.customEmojiId, client: client, size: 16)
                     .frame(width: 20)
             }
-            Text(suggestion.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.textPrimary)
-            Text(suggestion.subtitle).font(.system(size: 12)).foregroundStyle(Theme.textSecondary).lineLimit(1)
+            Text(suggestion.title).scaledFont(13, weight: .semibold).foregroundStyle(Theme.textPrimary)
+            Text(suggestion.subtitle).scaledFont(12).foregroundStyle(Theme.textSecondary).lineLimit(1)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 12)
-        .frame(height: 30)
+        .frame(minHeight: 30)
         .background(selected ? Theme.accent.opacity(0.28) : .clear)
     }
 }

@@ -58,6 +58,16 @@ final class Workspace {
     var recentEmojis: [String] = []
     var memberCounts: [String: Int] = [:]
     var localError: String?
+    var quickSwitcherQuery = ""
+    var scrollRequest: ScrollRequest?
+    var highlightedPostId: String?
+    var searchFocusRequest = 0
+    @ObservationIgnored var scrollReport = ScrollReport()
+    @ObservationIgnored var scrollSequence = 0
+    @ObservationIgnored var handledScrollSequence = 0
+    @ObservationIgnored var highlightTask: Task<Void, Never>?
+    @ObservationIgnored var highlightDuration: Duration = .seconds(2.5)
+    @ObservationIgnored private(set) var lastThreadRootId: String?
 
     var visibleError: String? { localError ?? session.lastError }
 
@@ -97,7 +107,9 @@ final class Workspace {
     }
 
     func openThread(rootId: String) async {
+        if let previous = threadRootId, previous != rootId { session.closeThread(rootId: previous) }
         rightPane = .thread(rootId)
+        lastThreadRootId = rootId
         await session.openThread(rootId: rootId)
     }
 
@@ -117,7 +129,7 @@ final class Workspace {
 
     func jump(to post: Post) async {
         if session.currentChannelId != post.channelId { await session.selectChannel(post.channelId) }
-        if post.isReply || post.replyCount > 0 { await openThread(rootId: post.threadId) }
+        await highlight(postId: post.id)
     }
 
     func select(channelId: String) async {
