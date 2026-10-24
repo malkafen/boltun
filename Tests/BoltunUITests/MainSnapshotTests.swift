@@ -19,9 +19,9 @@ struct MainSnapshotTests {
 
     @Test func mainWindowWithMockData() async {
         let (model, _) = Fixture.appModel()
-        let rep = await Snapshot.render(MainView(model: model), size: size, name: "main-mock", settle: .milliseconds(900))
+        let rep = await MainSnapshot.render(MainView(model: model), size: size, name: "main-mock", settle: .milliseconds(900))
         #expect(rep.pixelsWide >= 1280)
-        #expect(Snapshot.distinctColors(rep) > 12)
+        #expect(MainSnapshot.distinctColors(rep) > 12)
     }
 
     @Test func workspaceWithThreadPane() async {
@@ -30,8 +30,8 @@ struct MainSnapshotTests {
         workspace.composer(for: ComposerTarget(channelId: "town", rootId: "p1")).userEdited(text: "Sounds good", cursor: 11)
         workspace.session.typing["town"] = ["alice": Date(), "bob": Date()]
         workspace.session.typing["town:p1"] = ["carol": Date()]
-        let rep = await Snapshot.render(WorkspaceView(workspace: workspace), size: size, name: "thread-pane", settle: .milliseconds(700))
-        #expect(Snapshot.distinctColors(rep) > 10)
+        let rep = await MainSnapshot.render(WorkspaceView(workspace: workspace), size: size, name: "thread-pane", settle: .milliseconds(700))
+        #expect(MainSnapshot.distinctColors(rep) > 10)
     }
 
     @Test func workspaceWithSearchResults() async {
@@ -41,18 +41,18 @@ struct MainSnapshotTests {
         let workspace = Fixture.workspace(transport: transport)
         workspace.searchQuery = "release"
         await workspace.search()
-        await Snapshot.render(WorkspaceView(workspace: workspace), size: size, name: "search-pane", settle: .milliseconds(500))
+        await MainSnapshot.render(WorkspaceView(workspace: workspace), size: size, name: "search-pane", settle: .milliseconds(500))
         workspace.searchResults = []
-        await Snapshot.render(WorkspaceView(workspace: workspace), size: CGSize(width: 1100, height: 500), name: "search-empty")
+        await MainSnapshot.render(WorkspaceView(workspace: workspace), size: CGSize(width: 1100, height: 500), name: "search-empty")
         workspace.isSearching = true
-        await Snapshot.render(WorkspaceView(workspace: workspace), size: CGSize(width: 1100, height: 500))
+        await MainSnapshot.render(WorkspaceView(workspace: workspace), size: CGSize(width: 1100, height: 500))
     }
 
     @Test func quickSwitcherOverlay() async {
         let workspace = Fixture.workspace()
         workspace.showQuickSwitcher = true
-        let rep = await Snapshot.render(WorkspaceView(workspace: workspace), size: size, name: "quick-switcher", settle: .milliseconds(500))
-        #expect(Snapshot.distinctColors(rep) > 8)
+        let rep = await MainSnapshot.render(WorkspaceView(workspace: workspace), size: size, name: "quick-switcher", settle: .milliseconds(500))
+        #expect(MainSnapshot.distinctColors(rep) > 8)
     }
 
     @Test func composerStates() async {
@@ -64,19 +64,19 @@ struct MainSnapshotTests {
             PendingUpload(filename: "notes.txt", size: 1200, state: .uploaded(FileInfo(id: "f", name: "notes.txt"))),
             PendingUpload(filename: "huge.mov", size: 1, state: .failed),
         ]
-        await Snapshot.render(WorkspaceView(workspace: workspace), size: size, name: "composer-autocomplete", settle: .milliseconds(500))
+        await MainSnapshot.render(WorkspaceView(workspace: workspace), size: size, name: "composer-autocomplete", settle: .milliseconds(500))
         composer.clearSuggestions()
         composer.uploads = []
         workspace.beginEdit(workspace.session.posts["p4"]!)
         workspace.session.config = ClientConfig(values: ["MaxPostSize": "50"])
-        await Snapshot.render(
+        await MainSnapshot.render(
             ComposerView(state: composer, workspace: workspace, placeholder: "Write").frame(width: 700).background(Theme.content),
             size: CGSize(width: 700, height: 160), name: "composer-editing"
         )
         composer.userEdited(text: "~", cursor: 1)
-        await Snapshot.render(ComposerView(state: composer, workspace: workspace, placeholder: "Write").padding(.top, 260).background(Theme.content), size: CGSize(width: 700, height: 420), name: "composer-channel-popup")
+        await MainSnapshot.render(ComposerView(state: composer, workspace: workspace, placeholder: "Write").padding(.top, 260).background(Theme.content), size: CGSize(width: 700, height: 420), name: "composer-channel-popup")
         composer.userEdited(text: ":sm", cursor: 3)
-        await Snapshot.render(ComposerView(state: composer, workspace: workspace, placeholder: "Write").padding(.top, 260).background(Theme.content), size: CGSize(width: 700, height: 420))
+        await MainSnapshot.render(ComposerView(state: composer, workspace: workspace, placeholder: "Write").padding(.top, 260).background(Theme.content), size: CGSize(width: 700, height: 420))
     }
 
     @Test func richMessageBlocks() async {
@@ -115,50 +115,50 @@ struct MainSnapshotTests {
         }
         .padding(.top, 20)
         .background(Theme.content)
-        let rep = await Snapshot.render(view, size: CGSize(width: 900, height: 1000), name: "rich-blocks", settle: .milliseconds(500))
-        #expect(Snapshot.distinctColors(rep) > 10)
+        let rep = await MainSnapshot.render(view, size: CGSize(width: 900, height: 1000), name: "rich-blocks", settle: .milliseconds(500))
+        #expect(MainSnapshot.distinctColors(rep) > 10)
     }
 
     @Test func placeholdersAndBanners() async {
         let (model, _) = Fixture.appModel()
         await model.selectServer(at: 1)
         var loginTapped: UUID?
-        await Snapshot.render(MainView(model: model, onLogin: { loginTapped = $0 }), size: CGSize(width: 1000, height: 600), name: "login-placeholder")
+        await MainSnapshot.render(MainView(model: model, onLogin: { loginTapped = $0 }), size: CGSize(width: 1000, height: 600), name: "login-placeholder")
         #expect(loginTapped == nil)
         let empty = AppModel(store: MemoryAppStateStore(), credentials: MemoryCredentialStore(), transport: Fixture.transport())
-        await Snapshot.render(MainView(model: empty), size: CGSize(width: 1000, height: 600), name: "no-servers")
+        await MainSnapshot.render(MainView(model: empty), size: CGSize(width: 1000, height: 600), name: "no-servers")
         let connecting = AppModel(store: MemoryAppStateStore(AppState(servers: [ServerConfig(name: "Pending", url: Fixture.serverURL)])), credentials: MemoryCredentialStore(), transport: Fixture.transport())
-        await Snapshot.render(MainView(model: connecting), size: CGSize(width: 1000, height: 600))
+        await MainSnapshot.render(MainView(model: connecting), size: CGSize(width: 1000, height: 600))
         let workspace = Fixture.workspace()
         workspace.session.connection = .reconnecting
         workspace.session.lastError = "Something went wrong while loading posts."
-        await Snapshot.render(WorkspaceView(workspace: workspace), size: size, name: "banners")
+        await MainSnapshot.render(WorkspaceView(workspace: workspace), size: size, name: "banners")
         workspace.session.connection = .failed("Timed out")
         workspace.session.currentChannelId = nil
-        await Snapshot.render(WorkspaceView(workspace: workspace), size: CGSize(width: 1000, height: 600), name: "no-channel")
+        await MainSnapshot.render(WorkspaceView(workspace: workspace), size: CGSize(width: 1000, height: 600), name: "no-channel")
         workspace.session.connection = .connected
         workspace.session.teams = []
         workspace.session.currentTeamId = nil
-        await Snapshot.render(ChannelView(workspace: workspace), size: CGSize(width: 700, height: 400))
+        await MainSnapshot.render(ChannelView(workspace: workspace), size: CGSize(width: 700, height: 400))
         workspace.session.connection = .idle
-        await Snapshot.render(ChannelView(workspace: workspace), size: CGSize(width: 700, height: 400))
+        await MainSnapshot.render(ChannelView(workspace: workspace), size: CGSize(width: 700, height: 400))
     }
 
     @Test func archivedAndLoadingChannels() async {
         let workspace = Fixture.workspace()
         workspace.session.currentChannelId = "old"
-        await Snapshot.render(ChannelView(workspace: workspace), size: CGSize(width: 800, height: 400), name: "archived")
+        await MainSnapshot.render(ChannelView(workspace: workspace), size: CGSize(width: 800, height: 400), name: "archived")
         workspace.session.currentChannelId = "dm-alice"
         var timeline = ChannelTimeline()
         timeline.loaded = true
         timeline.hasMoreOlder = false
         workspace.session.timelines["dm-alice"] = timeline
-        await Snapshot.render(ChannelView(workspace: workspace), size: CGSize(width: 800, height: 400), name: "empty-dm")
+        await MainSnapshot.render(ChannelView(workspace: workspace), size: CGSize(width: 800, height: 400), name: "empty-dm")
         workspace.session.currentChannelId = "gm"
         workspace.session.timelines["gm"] = timeline
-        await Snapshot.render(ChannelView(workspace: workspace), size: CGSize(width: 800, height: 400))
+        await MainSnapshot.render(ChannelView(workspace: workspace), size: CGSize(width: 800, height: 400))
         workspace.session.currentChannelId = "secret"
-        await Snapshot.render(ChannelView(workspace: workspace), size: CGSize(width: 800, height: 400))
+        await MainSnapshot.render(ChannelView(workspace: workspace), size: CGSize(width: 800, height: 400))
     }
 
     @Test func sheetsAndPopovers() async {
@@ -166,12 +166,12 @@ struct MainSnapshotTests {
         transport.on("GET", "teams/t1/channels", value: [Fixture.channels()[0], Channel(id: "new", teamId: "t1", name: "random", displayName: "Random", purpose: "Anything goes")])
         transport.on("GET", "users/autocomplete", json: String(data: try! MattermostJSON.encoder.encode(["users": [Fixture.alice, Fixture.carol]]), encoding: .utf8)!)
         let workspace = Fixture.workspace(transport: transport)
-        await Snapshot.render(BrowseChannelsSheet(workspace: workspace), size: CGSize(width: 520, height: 480), name: "browse-channels", settle: .milliseconds(500))
-        await Snapshot.render(DirectMessageSheet(workspace: workspace), size: CGSize(width: 460, height: 460), name: "direct-messages", settle: .milliseconds(500))
-        await Snapshot.render(ImagePreviewSheet(workspace: workspace, file: FileInfo(id: "f-img", name: "screenshot.png", size: 1000, hasPreviewImage: true)), size: CGSize(width: 800, height: 600), name: "image-preview", settle: .milliseconds(400))
+        await MainSnapshot.render(BrowseChannelsSheet(workspace: workspace), size: CGSize(width: 520, height: 480), name: "browse-channels", settle: .milliseconds(500))
+        await MainSnapshot.render(DirectMessageSheet(workspace: workspace), size: CGSize(width: 460, height: 460), name: "direct-messages", settle: .milliseconds(500))
+        await MainSnapshot.render(ImagePreviewSheet(workspace: workspace, file: FileInfo(id: "f-img", name: "screenshot.png", size: 1000, hasPreviewImage: true)), size: CGSize(width: 800, height: 600), name: "image-preview", settle: .milliseconds(400))
         workspace.recentEmojis = ["rocket"]
-        await Snapshot.render(EmojiPicker(workspace: workspace) { _ in }.background(Theme.popover), size: CGSize(width: 300, height: 280), name: "emoji-picker")
-        await Snapshot.render(EmojiPicker(workspace: workspace) { _ in }.background(Theme.popover), size: CGSize(width: 300, height: 280))
+        await MainSnapshot.render(EmojiPicker(workspace: workspace) { _ in }.background(Theme.popover), size: CGSize(width: 300, height: 280), name: "emoji-picker")
+        await MainSnapshot.render(EmojiPicker(workspace: workspace) { _ in }.background(Theme.popover), size: CGSize(width: 300, height: 280))
     }
 
     @Test func components() async {
@@ -207,15 +207,15 @@ struct MainSnapshotTests {
         }
         .padding(20)
         .background(Theme.sidebar)
-        let rep = await Snapshot.render(view, size: CGSize(width: 520, height: 900), name: "components")
-        #expect(Snapshot.distinctColors(rep) > 8)
+        let rep = await MainSnapshot.render(view, size: CGSize(width: 520, height: 900), name: "components")
+        #expect(MainSnapshot.distinctColors(rep) > 8)
     }
 
     @Test func sidebarVariants() async {
         let workspace = Fixture.workspace()
         workspace.session.categories["t1"]?[1].collapsed = true
         workspace.session.teams = [Team(id: "t1", name: "engineering", displayName: "Engineering")]
-        await Snapshot.render(ChannelSidebar(workspace: workspace), size: CGSize(width: 250, height: 600), name: "sidebar-collapsed")
-        await Snapshot.render(SidebarSectionHeader(section: SidebarSection(id: "d", title: "Direct Messages", type: .directMessages, collapsed: false, channelIds: []), onToggle: {}, onAdd: {}), size: CGSize(width: 250, height: 40))
+        await MainSnapshot.render(ChannelSidebar(workspace: workspace), size: CGSize(width: 250, height: 600), name: "sidebar-collapsed")
+        await MainSnapshot.render(SidebarSectionHeader(section: SidebarSection(id: "d", title: "Direct Messages", type: .directMessages, collapsed: false, channelIds: []), onToggle: {}, onAdd: {}), size: CGSize(width: 250, height: 40))
     }
 }

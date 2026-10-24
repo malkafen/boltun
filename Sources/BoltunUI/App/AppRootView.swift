@@ -38,7 +38,7 @@ public struct AppRootView: View {
         if model.servers.isEmpty {
             WelcomeView { router.presentAddServer() }
         } else {
-            MainView(model: model)
+            MainView(model: model, onAddServer: { router.presentAddServer() }, onLogin: { router.presentLogin(serverId: $0) })
         }
     }
 
