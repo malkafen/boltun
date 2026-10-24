@@ -113,7 +113,8 @@ struct AppHarness {
         #expect(app.selectedServerId == harness.second.id)
         #expect(app.settings.lastServerId == harness.second.id)
         #expect(harness.credentials.token(for: harness.first.id) == nil)
-        await eventuallyAsync { harness.server.transport.count("POST", "users/logout") == 1 }
+        let server = harness.server
+        #expect(await eventuallyAsync { server.transport.count("POST", "users/logout") == 1 })
         await app.removeServer(harness.second.id)
         #expect(app.selectedServerId == nil)
         #expect(harness.store.load().servers.isEmpty)

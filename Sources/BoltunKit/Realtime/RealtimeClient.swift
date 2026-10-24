@@ -39,8 +39,16 @@ public final class URLSessionWebSocketConnection: WebSocketConnection, @unchecke
 public struct URLSessionWebSocketConnector: WebSocketConnector {
     let session: URLSession
 
-    public init(session: URLSession = URLSession(configuration: .default)) {
+    public init(session: URLSession = URLSessionWebSocketConnector.makeSession()) {
         self.session = session
+    }
+
+    public static func makeSession() -> URLSession {
+        let configuration = URLSessionConfiguration.default
+        configuration.httpCookieStorage = nil
+        configuration.httpShouldSetCookies = false
+        configuration.urlCache = nil
+        return URLSession(configuration: configuration)
     }
 
     public func connect(url: URL, token: String) -> WebSocketConnection {
@@ -79,6 +87,7 @@ public actor RealtimeClient {
     private var announced = false
     private var stopped = false
     private var skipBackoff = false
+    private var attempt = 0
     private let continuation: AsyncStream<RealtimeEvent>.Continuation
     public nonisolated let events: AsyncStream<RealtimeEvent>
 
@@ -149,7 +158,7 @@ public actor RealtimeClient {
     }
 
     private func run() async {
-        var attempt = 0
+        attempt = 0
         while !Task.isCancelled && !stopped {
             let connection = connector.connect(url: connectionURL(), token: token)
             generation += 1
@@ -162,11 +171,6 @@ public actor RealtimeClient {
             do {
                 while !Task.isCancelled && !stopped {
                     let text = try await connection.receive()
-                    if !established {
-                        established = true
-                        attempt = 0
-                        watchdog?.cancel()
-                    }
                     handle(text)
                 }
             } catch {
@@ -225,7 +229,7 @@ public actor RealtimeClient {
 
     private func handle(_ text: String) {
         guard let event = WebSocketEvent.parse(text) else {
-            if !announced && !connectionId.isEmpty { announce(needsResync: false) }
+            handleReply(text)
             return
         }
         if event.event == WebSocketEventType.hello {
@@ -260,7 +264,22 @@ public actor RealtimeClient {
         announce(needsResync: needsResync)
     }
 
+    private func handleReply(_ text: String) {
+        let reply = text.data(using: .utf8).flatMap { try? MattermostJSON.decoder.decode(JSONObject.self, from: $0) } ?? [:]
+        if reply["status"]?.stringValue == "FAIL" {
+            if reply["error"]?["id"]?.stringValue?.contains("not_authenticated") == true { connection?.close() }
+            return
+        }
+        if !announced && !connectionId.isEmpty { announce(needsResync: false) }
+    }
+
     private func announce(needsResync: Bool) {
+        if !established {
+            established = true
+            attempt = 0
+            watchdog?.cancel()
+            watchdog = nil
+        }
         announced = true
         hasConnectedBefore = true
         continuation.yield(.connected(needsResync: needsResync))

@@ -319,6 +319,68 @@ import Testing
         await client.stop()
     }
 
+    @Test func repliesWithoutHelloDoNotEstablish() async throws {
+        let connector = FakeConnector()
+        let gate = Gate()
+        let client = RealtimeClient(url: url, token: "tok", connector: connector, handshakeTimeout: .seconds(7)) { duration in
+            if duration == .seconds(7) {
+                await gate.wait()
+            } else {
+                try await Task.sleep(for: .seconds(3600))
+            }
+        }
+        let collector = EventCollector(client)
+        await client.start()
+        let first = try await socket(connector, 0)
+        first.push(["status": "FAIL", "seq_reply": 1, "error": ["id": "api.web_socket_router.bad_seq.app_error"]])
+        first.push(["status": "OK", "seq_reply": 1])
+        first.push("not json")
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(!first.isClosed)
+        await gate.open()
+        #expect(await eventuallyAsync { first.isClosed })
+        #expect(await eventuallyAsync { await collector.disconnects == 1 })
+        #expect(await collector.connections.isEmpty)
+        await client.stop()
+    }
+
+    @Test func notAuthenticatedReplyClosesConnection() async throws {
+        let connector = FakeConnector()
+        let client = make(connector)
+        let collector = EventCollector(client)
+        await client.start()
+        let first = try await socket(connector, 0)
+        first.push(["status": "FAIL", "seq_reply": 1, "error": ["id": "api.web_socket_router.not_authenticated.app_error"]])
+        #expect(await eventuallyAsync { first.isClosed })
+        #expect(await eventuallyAsync { await collector.disconnects == 1 })
+        #expect(await collector.connections.isEmpty)
+        await client.stop()
+    }
+
+    @Test func failedReplyDoesNotAnnounceResume() async throws {
+        let connector = FakeConnector()
+        let client = make(connector, sleeper: SleepRecorder())
+        let collector = EventCollector(client)
+        await client.start()
+        let first = try await socket(connector, 0)
+        first.push(Fixtures.hello("conn1"))
+        #expect(await eventuallyAsync { await collector.connections == [false] })
+        first.close()
+        let second = try await socket(connector, 1)
+        second.push(["status": "FAIL", "seq_reply": 1, "error": ["id": "api.web_socket_router.bad_seq.app_error"]])
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(await collector.connections == [false])
+        second.push(["status": "OK", "seq_reply": 1])
+        #expect(await eventuallyAsync { await collector.connections == [false, false] })
+        await client.stop()
+    }
+
+    @Test func connectorSessionIgnoresCookies() {
+        let session = URLSessionWebSocketConnector.makeSession()
+        #expect(session.configuration.httpCookieStorage == nil)
+        #expect(session.configuration.httpShouldSetCookies == false)
+    }
+
     @Test func backoffSchedule() async {
         let client = make(FakeConnector())
         #expect(await client.backoff(attempt: 0) == .seconds(1))

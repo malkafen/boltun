@@ -295,7 +295,7 @@ public final class ServerSession {
         }
     }
 
-    static func sortedTeams(_ list: [Team]) -> [Team] {
+    nonisolated static func sortedTeams(_ list: [Team]) -> [Team] {
         list.filter { $0.deleteAt == 0 }.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
 
