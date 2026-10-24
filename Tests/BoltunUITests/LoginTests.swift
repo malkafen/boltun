@@ -1,4 +1,5 @@
 import AppKit
+import AuthenticationServices
 import BoltunKit
 import Foundation
 import SwiftUI
@@ -278,5 +279,38 @@ struct LoginSSOTests {
 
     @Test @MainActor func systemAuthenticatorConstructs() {
         _ = SystemWebAuthenticator()
+    }
+
+    @Test func mapsWebAuthenticationResults() {
+        let url = URL(string: "mmauth://callback?MMAUTHTOKEN=t")!
+        #expect(SystemWebAuthenticator.result(callback: url, error: nil) == .success(url))
+        #expect(SystemWebAuthenticator.result(callback: nil, error: ASWebAuthenticationSessionError(.canceledLogin)) == .failure(.cancelled))
+        #expect(SystemWebAuthenticator.result(callback: nil, error: nil) == .failure(.failed("Sign-in failed.")))
+        let failure = SystemWebAuthenticator.result(callback: nil, error: ASWebAuthenticationSessionError(.presentationContextInvalid))
+        #expect(failure != .failure(.cancelled))
+        #expect((try? failure.get()) == nil)
+    }
+
+    @Test func completionHandlerRunsOffMainQueueAndResumesOnce() async throws {
+        let url = URL(string: "mmauth://callback?MMAUTHTOKEN=t")!
+        let received = try await withCheckedThrowingContinuation { continuation in
+            let handler = SystemWebAuthenticator.completionHandler(WebAuthenticationGate(continuation))
+            DispatchQueue(label: "test.xpc").async {
+                handler(url, nil)
+                handler(nil, ASWebAuthenticationSessionError(.canceledLogin))
+            }
+        }
+        #expect(received == url)
+    }
+
+    @Test func gateIgnoresLateResumes() async {
+        let result = await Task {
+            try await withCheckedThrowingContinuation { continuation in
+                let gate = WebAuthenticationGate(continuation)
+                gate.resume(with: .failure(.cancelled))
+                gate.resume(with: .success(URL(string: "mmauth://callback")!))
+            }
+        }.result
+        #expect((try? result.get()) == nil)
     }
 }
