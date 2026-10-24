@@ -57,6 +57,9 @@ public enum DebugCommand: Equatable, Sendable {
     case burnOnRead(on: Bool)
     case reveal(index: Int, postId: String?)
     case burn(index: Int, postId: String?)
+    case channelMove(channel: String, category: String?, index: Int?)
+    case categoryMove(category: String, index: Int)
+    case categorySort(category: String, sorting: CategorySorting)
 
     public enum TeamMoveTarget: Equatable, Sendable {
         case team(String)
@@ -224,7 +227,35 @@ public enum DebugCommand: Equatable, Sendable {
         case "burn":
             return .burn(index: index(query["index"]) ?? 0, postId: nonEmpty(query["post"]))
         default:
+            return makeSidebarOrder(action: action, query: query)
+        }
+    }
+
+    static func makeSidebarOrder(action: String, query: [String: String]) -> DebugCommand? {
+        switch action {
+        case "channel-move":
+            guard let channel = nonEmpty(query["channel"]) else { return nil }
+            let category = nonEmpty(query["category"])
+            let position = index(query["index"])
+            guard category != nil || position != nil else { return nil }
+            return .channelMove(channel: channel, category: category, index: position)
+        case "category-move":
+            guard let category = nonEmpty(query["category"]), let position = index(query["index"]) else { return nil }
+            return .categoryMove(category: category, index: position)
+        case "category-sort":
+            guard let category = nonEmpty(query["category"]), let sorting = query["sorting"].flatMap(categorySorting) else { return nil }
+            return .categorySort(category: category, sorting: sorting)
+        default:
             return nil
+        }
+    }
+
+    static func categorySorting(_ value: String) -> CategorySorting? {
+        switch value.lowercased() {
+        case "alpha", "alphabetical": return .alphabetical
+        case "recent": return .recent
+        case "manual": return .manual
+        default: return nil
         }
     }
 

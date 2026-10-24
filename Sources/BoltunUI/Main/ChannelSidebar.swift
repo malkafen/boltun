@@ -65,10 +65,17 @@ struct SidebarRowModel: Equatable, Identifiable {
 
 struct ChannelSidebar: View {
     let workspace: Workspace
+    @State private var drag = SidebarDragState()
+
+    static func visibleSections(_ sections: [SidebarSection]) -> [SidebarSection] {
+        sections.filter { $0.type != .favorites || !$0.channelIds.isEmpty }
+    }
 
     var body: some View {
         let session = workspace.session
-        let sections = session.sidebar.filter { $0.type != .favorites || !$0.channelIds.isEmpty }
+        let all = session.sidebar
+        let sections = Self.visibleSections(all)
+        let order = session.currentTeamId.flatMap { session.categories[$0] }?.map(\.id) ?? []
         let rows = Dictionary(uniqueKeysWithValues: sections.flatMap(\.channelIds).compactMap { id in SidebarRowModel.make(channelId: id, session: session).map { (id, $0) } })
         VStack(spacing: 0) {
             SidebarHeader(workspace: workspace)
@@ -83,27 +90,49 @@ struct ChannelSidebar: View {
                         } onAdd: {
                             if section.type == .directMessages { workspace.showDirectMessages = true } else { workspace.showBrowseChannels = true }
                         }
+                        .overlay { SidebarSectionDropIndicator(drag: drag, sectionId: section.id) }
+                        .contextMenu { SidebarCategoryMenu(model: .make(section: section, visible: sections, order: order), session: session) }
+                        .onDrag { drag.begin(.category(section.id)) }
+                        .onDrop(of: [.plainText], delegate: dropDelegate(.header(section.id)))
                         ForEach(SidebarRowModel.visibleIds(section: section, rows: rows), id: \.self) { id in
                             if let row = rows[id] {
                                 SidebarRow(row: row, client: session.client) {
                                     Task { await workspace.select(channelId: id) }
                                 }
                                 .equatable()
-                                .contextMenu { SidebarContextMenu(workspace: workspace, row: row) }
+                                .overlay { SidebarRowDropIndicator(drag: drag, rowId: id) }
+                                .contextMenu {
+                                    SidebarContextMenu(workspace: workspace, row: row, move: .make(channelId: id, isDirect: row.isDirect, sections: all))
+                                }
+                                .onDrag { drag.begin(.channel(id)) }
+                                .onDrop(of: [.plainText], delegate: dropDelegate(.channel(id, section: section.id)))
                             }
                         }
                     }
+                    SidebarEndDropZone(drag: drag)
+                        .onDrop(of: [.plainText], delegate: dropDelegate(.end))
                 }
-                .padding(.bottom, 12)
+                .animation(.easeOut(duration: 0.15), value: sections.map(\.channelIds))
+                .animation(.easeOut(duration: 0.15), value: sections.map(\.id))
             }
         }
         .background(Theme.sidebar)
+    }
+
+    func dropDelegate(_ target: SidebarDropTarget) -> SidebarDropDelegate {
+        let session = workspace.session
+        return SidebarDropDelegate(target: target, drag: drag) { item, target in
+            session.sidebarDropPlan(item, onto: target)
+        } perform: { action in
+            Task { await session.perform(action) }
+        }
     }
 }
 
 struct SidebarContextMenu: View {
     let workspace: Workspace
     let row: SidebarRowModel
+    var move: SidebarChannelMenuModel?
 
     var body: some View {
         let session = workspace.session
@@ -117,6 +146,10 @@ struct SidebarContextMenu: View {
         }
         Divider()
         ChannelNotifyMenuItems(workspace: workspace, channelId: row.id, isDirect: row.isDirect)
+        if let move {
+            Divider()
+            SidebarChannelMoveItems(channelId: row.id, model: move, session: session)
+        }
         Divider()
         if row.isDirect {
             Button("Close Conversation") { Task { await workspace.closeConversation(channelId: row.id) } }

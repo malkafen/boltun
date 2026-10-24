@@ -92,6 +92,7 @@ struct AutomationUIState: Codable, Equatable, Sendable {
     var threadFollowing: Bool?
     var readInfo: ReadInfoFeatures?
     var readStatus: ReadStatusTracking?
+    var sidebar: [SidebarCategorySummary] = []
 
     struct Editor: Codable, Equatable, Sendable {
         var spellChecking: Bool
@@ -286,6 +287,8 @@ extension DebugAutomation {
             case .endOfOthers: session.moveTeam(team.id, onto: .endOfOthers)
             }
             return session.orderedTeams.map(\.name).joined(separator: ",")
+        case .channelMove, .categoryMove, .categorySort:
+            return try await performSidebarOrder(command, session: session)
         default:
             throw AutomationError.invalidCommand
         }
@@ -428,7 +431,8 @@ extension DebugAutomation {
                 burnOnRead: session.burnOnReadEnabled,
                 licenseSku: session.license.skuShortName
             ),
-            readStatus: Self.readStatusTracking(session: session, channelId: channelId)
+            readStatus: Self.readStatusTracking(session: session, channelId: channelId),
+            sidebar: Self.sidebarSummary(session)
         )
     }
 
