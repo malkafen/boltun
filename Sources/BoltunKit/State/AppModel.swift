@@ -167,8 +167,9 @@ public final class AppModel {
 
     public func removeServer(_ serverId: UUID) async {
         if let session = sessions[serverId] {
-            try? await session.client.logout()
             session.stop()
+            let client = session.client
+            Task.detached { try? await client.logout() }
         }
         sessions[serverId] = nil
         credentials.removeToken(for: serverId)

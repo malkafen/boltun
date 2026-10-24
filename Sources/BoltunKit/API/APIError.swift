@@ -33,15 +33,16 @@ public enum APIError: Error, Equatable, Sendable, LocalizedError {
         return false
     }
 
+    static let mfaErrorIds: Set<String> = [
+        "mfa.validate_token.authenticate.app_error",
+        "api.context.mfa_required.app_error",
+        "api.user.check_user_mfa.bad_code.app_error",
+    ]
+
     public static func from(status: Int, data: Data) -> APIError {
         let body = try? MattermostJSON.decoder.decode(ServerErrorBody.self, from: data)
-        if status == 401 {
-            if body?.id == "mfa.validate_token.authenticate.app_error" || body?.id == "api.context.mfa_required.app_error" {
-                return .mfaRequired
-            }
-            return .unauthorized(body)
-        }
-        if body?.id == "mfa.validate_token.authenticate.app_error" { return .mfaRequired }
+        if let id = body?.id, mfaErrorIds.contains(id) { return .mfaRequired }
+        if status == 401 { return .unauthorized(body) }
         return .server(status: status, body: body)
     }
 
@@ -49,6 +50,12 @@ public enum APIError: Error, Equatable, Sendable, LocalizedError {
         if let error = error as? APIError { return error }
         if let error = error as? DecodingError { return .decoding(String(describing: error)) }
         return .transport(error.localizedDescription)
+    }
+
+    public static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        if let error = error as? URLError, error.code == .cancelled { return true }
+        return false
     }
 }
 
