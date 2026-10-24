@@ -96,13 +96,12 @@ struct ComposerTextView: NSViewRepresentable {
         textView.importsGraphics = false
         textView.allowsUndo = true
         textView.drawsBackground = false
-        textView.font = .systemFont(ofSize: fontSize)
         textView.textColor = NSColor.white.withAlphaComponent(0.92)
         textView.insertionPointColor = .white
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
-        textView.isContinuousSpellCheckingEnabled = true
+        Self.applyPreferences(to: textView, fontSize: fontSize * context.environment.fontScale, spellChecking: context.environment.spellChecking)
         textView.textContainerInset = .zero
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.widthTracksTextView = true
@@ -129,6 +128,9 @@ struct ComposerTextView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         let coordinator = context.coordinator
         guard let textView = coordinator.textView else { return }
+        if Self.applyPreferences(to: textView, fontSize: fontSize * context.environment.fontScale, spellChecking: context.environment.spellChecking) {
+            coordinator.updateHeight()
+        }
         if coordinator.appliedRevision != state.textRevision {
             coordinator.appliedRevision = state.textRevision
             coordinator.isApplying = true
@@ -142,6 +144,21 @@ struct ComposerTextView: NSViewRepresentable {
             coordinator.appliedFocus = state.focusRevision
             DispatchQueue.main.async { textView.window?.makeFirstResponder(textView) }
         }
+    }
+
+    @discardableResult
+    static func applyPreferences(to textView: NSTextView, fontSize: CGFloat, spellChecking: Bool) -> Bool {
+        if textView.isContinuousSpellCheckingEnabled != spellChecking {
+            textView.isContinuousSpellCheckingEnabled = spellChecking
+            if !spellChecking, let storage = textView.textStorage {
+                textView.layoutManager?.removeTemporaryAttribute(.spellingState, forCharacterRange: NSRange(location: 0, length: storage.length))
+            }
+        }
+        guard textView.font?.pointSize != fontSize else { return false }
+        let font = NSFont.systemFont(ofSize: fontSize)
+        textView.font = font
+        textView.typingAttributes[.font] = font
+        return true
     }
 
     @MainActor
@@ -183,7 +200,8 @@ struct ComposerTextView: NSViewRepresentable {
             guard let textView, let layoutManager = textView.layoutManager, let container = textView.textContainer else { return }
             layoutManager.ensureLayout(for: container)
             let used = layoutManager.usedRect(for: container).height
-            let height = min(ComposerTextView.maxHeight, max(ComposerTextView.minHeight, ceil(used)))
+            let lineHeight = textView.font.map { layoutManager.defaultLineHeight(for: $0) } ?? 0
+            let height = min(ComposerTextView.maxHeight, max(ComposerTextView.minHeight, ceil(lineHeight), ceil(used)))
             if abs(state.editorHeight - height) > 0.5 { state.editorHeight = height }
         }
     }

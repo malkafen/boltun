@@ -20,6 +20,9 @@ struct BlockView: View {
     let block: MessageBlock
     let client: APIClient?
     var scale: Double = 1
+    @Environment(\.fontScale) private var fontScale
+
+    var effectiveScale: Double { scale * fontScale }
 
     static func headingSize(level: Int) -> CGFloat {
         let sizes: [CGFloat] = [22, 19, 17, 15, 14, 13.5]
@@ -30,20 +33,20 @@ struct BlockView: View {
         switch block {
         case .paragraph(let text):
             Text(text)
-                .font(Theme.messageFont(scale: scale))
+                .font(Theme.messageFont(scale: effectiveScale))
                 .foregroundStyle(Theme.textPrimary)
                 .lineSpacing(2)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
         case .heading(let level, let text):
             Text(text)
-                .font(.system(size: Self.headingSize(level: level) * scale, weight: .semibold))
+                .font(.system(size: Self.headingSize(level: level) * effectiveScale, weight: .semibold))
                 .foregroundStyle(Theme.textPrimary)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 2)
         case .code(let language, let code):
-            CodeBlockView(language: language, code: code, scale: scale)
+            CodeBlockView(language: language, code: code, scale: effectiveScale)
         case .quote(let blocks):
             HStack(alignment: .top, spacing: 10) {
                 RoundedRectangle(cornerRadius: 1.5).fill(Theme.quoteBar).frame(width: 3)
@@ -56,7 +59,7 @@ struct BlockView: View {
                 ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(ordered ? "\(start + index)." : "•")
-                            .font(Theme.messageFont(scale: scale))
+                            .font(Theme.messageFont(scale: effectiveScale))
                             .monospacedDigit()
                             .foregroundStyle(Theme.textSecondary)
                             .frame(minWidth: 16, alignment: .trailing)
@@ -65,7 +68,7 @@ struct BlockView: View {
                 }
             }
         case .table(let header, let rows):
-            TableBlockView(header: header, rows: rows, scale: scale)
+            TableBlockView(header: header, rows: rows, scale: effectiveScale)
         case .thematicBreak:
             Rectangle().fill(Theme.border).frame(height: 1).padding(.vertical, 4)
         case .image(let url, let alt):
@@ -89,7 +92,7 @@ struct CodeBlockView: View {
         VStack(alignment: .leading, spacing: 0) {
             if let language, !language.isEmpty {
                 Text(language)
-                    .font(.system(size: 10.5, weight: .semibold))
+                    .scaledFont(10.5, weight: .semibold)
                     .foregroundStyle(Theme.textSecondary)
                     .padding(.horizontal, 10)
                     .padding(.top, 6)

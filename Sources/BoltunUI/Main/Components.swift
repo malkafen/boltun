@@ -191,6 +191,23 @@ struct Banner: View {
     }
 }
 
+struct ScaledFont: ViewModifier {
+    @Environment(\.fontScale) private var scale
+    let size: CGFloat
+    var weight: Font.Weight = .regular
+    var design: Font.Design = .default
+
+    func body(content: Content) -> some View {
+        content.font(.system(size: size * scale, weight: weight, design: design))
+    }
+}
+
+extension View {
+    func scaledFont(_ size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default) -> some View {
+        modifier(ScaledFont(size: size, weight: weight, design: design))
+    }
+}
+
 struct HiddenShortcut: View {
     let key: KeyEquivalent
     let modifiers: EventModifiers

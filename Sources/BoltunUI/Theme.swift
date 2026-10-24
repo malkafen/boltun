@@ -46,6 +46,7 @@ extension Theme {
     public static let mentionRow = Color(red: 0.98, green: 0.80, blue: 0.30).opacity(0.07)
     public static let mentionRowHover = Color(red: 0.98, green: 0.80, blue: 0.30).opacity(0.11)
     public static let mentionRowBar = Color(red: 0.98, green: 0.78, blue: 0.30).opacity(0.75)
+    public static let postHighlight = Color(red: 0.98, green: 0.80, blue: 0.30).opacity(0.22)
     public static let editingHighlight = Color(red: 0.95, green: 0.70, blue: 0.25).opacity(0.10)
     public static let avatarPalette: [Color] = [
         Color(red: 0.36, green: 0.53, blue: 0.86),

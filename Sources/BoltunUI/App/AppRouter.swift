@@ -1,6 +1,7 @@
 import BoltunKit
 import Foundation
 import Observation
+import SwiftUI
 
 public enum AppSheet: Identifiable, Hashable, Sendable {
     case addServer
@@ -49,6 +50,7 @@ public final class AppRouter {
     @ObservationIgnored public var openSettingsWindow: () -> Void = {}
     @ObservationIgnored public var openExternalURL: (URL) -> Void = { _ in }
     @ObservationIgnored public var connectionTimeout: Duration = .seconds(20)
+    @ObservationIgnored let workspaces = WorkspaceRegistry()
     @ObservationIgnored private var sequence = 0
 
     public init(model: AppModel) {
@@ -80,7 +82,7 @@ public final class AppRouter {
         lastCommand = AppCommandEvent(sequence: sequence, command: command)
         switch command {
         case .toggleSidebar:
-            isSidebarVisible.toggle()
+            withAnimation(.easeInOut(duration: 0.2)) { isSidebarVisible.toggle() }
         case .toggleThreadPane:
             isThreadPaneVisible.toggle()
         case .openThread(let rootId):
