@@ -444,7 +444,7 @@ extension MockServer {
         session.scheduleBurnOnReadExpiry()
         #expect(session.posts[Self.incoming] != nil)
         clock = 2_000
-        #expect(await eventually(timeout: .seconds(2)) { session.posts[Self.incoming] == nil })
+        #expect(await eventually { session.posts[Self.incoming] == nil })
         #expect(session.nextBurnOnReadExpiry == nil)
         #expect(session.burnOnReadTask == nil)
         session.stop()
