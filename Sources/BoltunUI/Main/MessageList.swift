@@ -128,6 +128,10 @@ final class ScrollTracker {
         return max(0, metrics.contentHeight - metrics.containerHeight - distance)
     }
 
+    func liveFrame(of id: String) -> CGRect? {
+        visibleIds.contains(id) ? frames[id] : nil
+    }
+
     func visibleRange(in items: [TimelineItem]) -> ClosedRange<Int>? {
         let visible = Set(visibleIds)
         let indices = items.indices.filter { visible.contains(items[$0].id) }
@@ -338,7 +342,7 @@ struct MessageListView: View {
                 let items = workspace.channelItems(channelId: channelId)
                 let searching = pass > 0
                 let step = ScrollTracker.alignmentStep(
-                    frame: tracker.frames[id],
+                    frame: tracker.liveFrame(of: id),
                     metrics: tracker.metrics,
                     targetIndex: searching ? items.firstIndex { $0.id == id } : nil,
                     visible: searching ? tracker.visibleRange(in: items) : nil

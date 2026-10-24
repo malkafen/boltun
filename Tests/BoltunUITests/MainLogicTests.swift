@@ -531,6 +531,15 @@ import Testing
         #expect(tracker.visibleRange(in: items) == 1...2)
     }
 
+    @Test func liveFrameIgnoresFramesOfRowsThatAreNotVisible() {
+        let tracker = ScrollTracker()
+        tracker.frames["new-messages"] = CGRect(x: 0, y: -3200, width: 100, height: 20)
+        #expect(tracker.liveFrame(of: "new-messages") == nil)
+        tracker.visibleIds = ["new-messages"]
+        #expect(tracker.liveFrame(of: "new-messages")?.minY == -3200)
+        #expect(tracker.liveFrame(of: "missing") == nil)
+    }
+
     @Test func timelineReadinessAndToastSignature() {
         var timeline = timeline(["a", "b"], loading: true)
         #expect(!TimelineReadiness(timeline).isReady)
