@@ -379,28 +379,51 @@ import Testing
 @Suite @MainActor struct MainViewModelTests {
     @Test func scrollFollow() {
         var state = ScrollFollowState()
-        func change(_ id: String?, _ count: Int, mine: Bool = false) -> Bool {
-            state.postsChanged(lastPostId: id, count: count, lastIsMine: mine)
+        var ids = ["a"]
+        func change(_ appended: [String], mine: Bool = false) -> Bool {
+            ids += appended
+            return state.postsChanged(postIds: ids, lastIsMine: mine)
         }
-        #expect(change("a", 10))
-        #expect(!change("a", 20))
+        #expect(change([]))
+        #expect(!change([]))
         state.scrolled(atBottom: false)
-        #expect(!change("b", 22))
+        #expect(!change(["x", "b"]))
         #expect(state.unseenCount == 2)
-        #expect(!change("c", 22))
+        #expect(!change(["c"]))
         #expect(state.unseenCount == 3)
-        #expect(change("d", 23, mine: true))
+        #expect(change(["d"], mine: true))
         #expect(state.unseenCount == 0)
         state.scrolled(atBottom: false)
-        _ = state.postsChanged(lastPostId: "e", count: 24, lastIsMine: false)
+        _ = change(["e"])
         state.scrolled(atBottom: true)
         #expect(state.unseenCount == 0)
         state.scrolled(atBottom: false)
-        _ = state.postsChanged(lastPostId: "f", count: 25, lastIsMine: false)
+        _ = change(["f"])
         state.jumpedToBottom()
         #expect(state.unseenCount == 0 && state.isAtBottom)
-        #expect(!change(nil, 0))
-        #expect(change("g", 1))
+        func replace(_ list: [String]) -> Bool {
+            state.postsChanged(postIds: list, lastIsMine: false)
+        }
+        #expect(!replace([]))
+        #expect(replace(["g"]))
+    }
+
+    @Test func olderPagesAreNotCountedAsUnseen() {
+        var state = ScrollFollowState()
+        let latest = (300..<360).map { "p\($0)" }
+        let initial = state.postsChanged(postIds: latest, lastIsMine: false)
+        #expect(initial)
+        state.scrolled(atBottom: false)
+        let older = (0..<300).map { "p\($0)" } + latest
+        let prepended = state.postsChanged(postIds: older, lastIsMine: false)
+        #expect(!prepended)
+        #expect(state.unseenCount == 0)
+        let appended = state.postsChanged(postIds: older + ["n1", "n2", "n3"], lastIsMine: false)
+        #expect(!appended)
+        #expect(state.unseenCount == 3)
+        let both = state.postsChanged(postIds: ["z"] + older + ["n1", "n2", "n3", "n4"], lastIsMine: false)
+        #expect(!both)
+        #expect(state.unseenCount == 4)
     }
 
     @Test func scrollMetrics() {
@@ -408,6 +431,74 @@ import Testing
         #expect(!ScrollMetrics(distanceFromTop: 0, distanceFromBottom: 500).isAtBottom)
         #expect(ScrollMetrics(distanceFromTop: 100, distanceFromBottom: 0).shouldLoadOlder)
         #expect(!ScrollMetrics(distanceFromTop: 5000, distanceFromBottom: 0).shouldLoadOlder)
+    }
+
+    @Test func forceScrollAlwaysChangesPosition() {
+        var position = ScrollPosition(edge: .bottom)
+        for _ in 0..<3 {
+            let before = position
+            position.forceScroll(to: .bottom, edgeItemId: "last")
+            #expect(position != before)
+        }
+        var top = ScrollPosition(edge: .top)
+        top.forceScroll(to: .top, edgeItemId: "first")
+        #expect(top.viewID(type: String.self) == "first")
+        top.forceScroll(to: .top, edgeItemId: "first")
+        #expect(top.edge == .top)
+        var noItems = ScrollPosition(edge: .bottom)
+        noItems.forceScroll(to: .bottom, edgeItemId: nil)
+        #expect(noItems.edge == .bottom)
+    }
+
+    @Test func scrollFollowSettlesOnlyAtBottom() {
+        var state = ScrollFollowState()
+        #expect(!state.settled)
+        state.scrolled(atBottom: false)
+        #expect(!state.settled)
+        state.scrolled(atBottom: true)
+        state.scrolled(atBottom: false)
+        #expect(state.settled)
+    }
+
+    func timeline(_ ids: [String], loading: Bool = false, more: Bool = true) -> ChannelTimeline {
+        var timeline = ChannelTimeline()
+        timeline.postIds = ids
+        timeline.loaded = true
+        timeline.isLoading = loading
+        timeline.hasMoreOlder = more
+        return timeline
+    }
+
+    @Test func prependKeepsDistanceFromBottom() {
+        let tracker = ScrollTracker()
+        let before = ScrollMetrics(distanceFromTop: 500, distanceFromBottom: 800, contentHeight: 1900, containerHeight: 600)
+        #expect(tracker.compensation(head: TimelineHead(timeline(["b", "c"])), old: before, new: before, settled: true) == nil)
+        let grown = ScrollMetrics(distanceFromTop: 500, distanceFromBottom: 2000, contentHeight: 3100, containerHeight: 600)
+        #expect(tracker.compensation(head: TimelineHead(timeline(["a", "b", "c"])), old: before, new: grown, settled: true) == 1700)
+        let scrolled = ScrollMetrics(distanceFromTop: 1580, distanceFromBottom: 920, contentHeight: 3100, containerHeight: 600)
+        #expect(tracker.compensation(head: TimelineHead(timeline(["a", "b", "c"])), old: grown, new: scrolled, settled: true) == nil)
+    }
+
+    @Test func loadingIndicatorChangeIsCompensated() {
+        let tracker = ScrollTracker()
+        let before = ScrollMetrics(distanceFromTop: 300, distanceFromBottom: 900, contentHeight: 1800, containerHeight: 600)
+        _ = tracker.compensation(head: TimelineHead(timeline(["a"])), old: before, new: before, settled: true)
+        let spinner = ScrollMetrics(distanceFromTop: 300, distanceFromBottom: 950, contentHeight: 1850, containerHeight: 600)
+        #expect(tracker.compensation(head: TimelineHead(timeline(["a"], loading: true)), old: before, new: spinner, settled: true) == 350)
+    }
+
+    @Test func noCompensationWhenUnsettledOrAtBottom() {
+        let before = ScrollMetrics(distanceFromTop: 100, distanceFromBottom: 900, contentHeight: 1600, containerHeight: 600)
+        let grown = ScrollMetrics(distanceFromTop: 100, distanceFromBottom: 2100, contentHeight: 2800, containerHeight: 600)
+        let unsettled = ScrollTracker()
+        _ = unsettled.compensation(head: TimelineHead(timeline(["b"])), old: before, new: before, settled: false)
+        #expect(unsettled.compensation(head: TimelineHead(timeline(["a", "b"])), old: before, new: grown, settled: false) == nil)
+        let bottom = ScrollTracker()
+        let atBottom = ScrollMetrics(distanceFromTop: 1000, distanceFromBottom: 0, contentHeight: 1600, containerHeight: 600)
+        _ = bottom.compensation(head: TimelineHead(timeline(["b"])), old: atBottom, new: atBottom, settled: true)
+        #expect(bottom.compensation(head: TimelineHead(timeline(["a", "b"])), old: atBottom, new: grown, settled: true) == nil)
+        #expect(ScrollTracker.compensatedOffset(preserving: 100, in: ScrollMetrics(distanceFromTop: 0, distanceFromBottom: 100.5, contentHeight: 700, containerHeight: 600)) == nil)
+        #expect(ScrollTracker.compensatedOffset(preserving: 900, in: ScrollMetrics(distanceFromTop: 0, distanceFromBottom: 0, contentHeight: 700, containerHeight: 600)) == 0)
     }
 
     @Test func serverTiles() {

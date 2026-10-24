@@ -5,25 +5,28 @@ struct ScrollFollowState: Equatable {
     var isAtBottom = true
     var unseenCount = 0
     var lastPostId: String?
-    var postCount = 0
+    var settled = false
 
     mutating func scrolled(atBottom: Bool) {
         isAtBottom = atBottom
-        if atBottom { unseenCount = 0 }
+        if atBottom {
+            unseenCount = 0
+            settled = true
+        }
     }
 
-    mutating func postsChanged(lastPostId newLast: String?, count: Int, lastIsMine: Bool) -> Bool {
-        defer {
-            lastPostId = newLast
-            postCount = count
-        }
-        guard let newLast, newLast != lastPostId else { return false }
-        guard lastPostId != nil else { return true }
+    mutating func postsChanged(postIds: [String], lastIsMine: Bool) -> Bool {
+        let newLast = postIds.last
+        let previous = lastPostId
+        lastPostId = newLast
+        guard let newLast, newLast != previous else { return false }
+        guard let previous else { return true }
         if isAtBottom || lastIsMine {
             unseenCount = 0
             return true
         }
-        unseenCount += max(1, count - postCount)
+        let appended = postIds.lastIndex(of: previous).map { postIds.count - 1 - $0 } ?? 1
+        unseenCount += max(1, appended)
         return false
     }
 
@@ -37,6 +40,7 @@ struct ScrollMetrics: Equatable {
     var distanceFromTop: CGFloat
     var distanceFromBottom: CGFloat
     var contentHeight: CGFloat = 0
+    var containerHeight: CGFloat = 0
 
     static let bottomThreshold: CGFloat = 80
     static let loadOlderThreshold: CGFloat = 600
@@ -55,12 +59,53 @@ struct ScrollZone: Equatable {
     }
 }
 
+extension ScrollPosition {
+    mutating func forceScroll(to edge: Edge, edgeItemId: String?) {
+        if self.edge == edge, let edgeItemId {
+            scrollTo(id: edgeItemId, anchor: edge == .top ? .top : .bottom)
+        } else {
+            scrollTo(edge: edge)
+        }
+    }
+}
+
+struct TimelineHead: Equatable {
+    var firstPostId: String?
+    var isLoading = false
+    var hasMoreOlder = true
+
+    init(_ timeline: ChannelTimeline) {
+        firstPostId = timeline.postIds.first
+        isLoading = timeline.isLoading
+        hasMoreOlder = timeline.hasMoreOlder
+    }
+}
+
+@MainActor
+final class ScrollTracker {
+    var head: TimelineHead?
+
+    func compensation(head newHead: TimelineHead, old: ScrollMetrics, new: ScrollMetrics, settled: Bool) -> CGFloat? {
+        let previous = head
+        head = newHead
+        guard settled, let previous, previous != newHead, new.contentHeight != old.contentHeight, !old.isAtBottom else { return nil }
+        return Self.compensatedOffset(preserving: old.distanceFromBottom, in: new)
+    }
+
+    nonisolated static func compensatedOffset(preserving distance: CGFloat, in metrics: ScrollMetrics) -> CGFloat? {
+        guard abs(metrics.distanceFromBottom - distance) > 1 else { return nil }
+        return max(0, metrics.contentHeight - metrics.containerHeight - distance)
+    }
+}
+
 struct MessageListView: View {
     let workspace: Workspace
     let channelId: String
     @State private var follow = ScrollFollowState()
     @State private var zone = ScrollZone()
     @State private var position = ScrollPosition(edge: .bottom)
+    @State private var focusPostId: String?
+    @State private var tracker = ScrollTracker()
 
     var body: some View {
         let session = workspace.session
@@ -91,20 +136,29 @@ struct MessageListView: View {
             ScrollMetrics(
                 distanceFromTop: geometry.contentOffset.y + geometry.contentInsets.top,
                 distanceFromBottom: geometry.contentSize.height - geometry.contentOffset.y - geometry.containerSize.height,
-                contentHeight: geometry.contentSize.height
+                contentHeight: geometry.contentSize.height,
+                containerHeight: geometry.containerSize.height
             )
-        } action: { _, metrics in
-            follow.scrolled(atBottom: metrics.isAtBottom)
+        } action: { old, metrics in
             let current = session.timelines[channelId] ?? ChannelTimeline()
-            let loadOlder = ScrollZone.shouldLoadOlder(zone: metrics.zone, timeline: current)
+            if let offset = tracker.compensation(head: TimelineHead(current), old: old, new: metrics, settled: follow.settled && focusPostId == nil) {
+                position.scrollTo(y: offset)
+                return
+            }
+            follow.scrolled(atBottom: metrics.isAtBottom)
+            let loadOlder = follow.settled && ScrollZone.shouldLoadOlder(zone: metrics.zone, timeline: current)
             report(metrics, loadOlder: loadOlder)
             if loadOlder {
                 Task { await session.loadOlder(channelId: channelId) }
             }
         }
-        .onChange(of: lastPost?.id, initial: true) { _, newId in
-            if follow.postsChanged(lastPostId: newId, count: timeline.postIds.count, lastIsMine: lastPost?.userId == session.myId) {
-                withAnimation(.easeOut(duration: 0.15)) { position.scrollTo(edge: .bottom) }
+        .onChange(of: lastPost?.id, initial: true) {
+            let postIds = session.timelines[channelId]?.postIds ?? []
+            if follow.postsChanged(postIds: postIds, lastIsMine: postIds.last.flatMap { session.posts[$0] }?.userId == session.myId), focusPostId == nil {
+                withAnimation(.easeOut(duration: 0.15)) { position.forceScroll(to: .bottom, edgeItemId: postIds.last) }
+            }
+            if workspace.scrollReport.channelId == channelId {
+                workspace.scrollReport.unseenCount = follow.unseenCount
             }
         }
         .onChange(of: workspace.scrollRequest, initial: true) { _, request in
@@ -114,7 +168,7 @@ struct MessageListView: View {
             if follow.unseenCount > 0 {
                 NewMessagesPill(count: follow.unseenCount) {
                     follow.jumpedToBottom()
-                    withAnimation { position.scrollTo(edge: .bottom) }
+                    withAnimation { position.forceScroll(to: .bottom, edgeItemId: items.last?.id) }
                 }
                 .padding(.bottom, 10)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -138,17 +192,27 @@ struct MessageListView: View {
         workspace.handledScrollSequence = request.sequence
         switch request.target {
         case .top:
-            position.scrollTo(edge: .top)
+            follow.settled = true
+            position.forceScroll(to: .top, edgeItemId: workspace.channelItems(channelId: channelId).first?.id)
         case .bottom:
             follow.jumpedToBottom()
-            position.scrollTo(edge: .bottom)
+            position.forceScroll(to: .bottom, edgeItemId: workspace.channelItems(channelId: channelId).last?.id)
         case .post(let postId):
+            focusPostId = postId
+            follow.scrolled(atBottom: false)
             Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(60))
-                withAnimation(.easeInOut(duration: 0.25)) { position.scrollTo(id: postId, anchor: .center) }
+                for delay in Self.focusPasses {
+                    try? await Task.sleep(for: delay)
+                    guard focusPostId == postId else { return }
+                    position.scrollTo(id: postId, anchor: .center)
+                }
+                follow.settled = true
+                focusPostId = nil
             }
         }
     }
+
+    static let focusPasses: [Duration] = [.milliseconds(30), .milliseconds(120), .milliseconds(300)]
 }
 
 struct NewMessagesPill: View {

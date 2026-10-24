@@ -29,6 +29,26 @@ struct MainLayoutTests {
     }
 }
 
+struct InlineCodeStyleTests {
+    @Test func stylesOnlyCodeRuns() {
+        var text = AttributedString("run ")
+        var code = AttributedString("swift test")
+        code.inlinePresentationIntent = .code
+        text.append(code)
+        text.append(AttributedString(" now"))
+        let styled = InlineCodeStyle.apply(text, scale: 1)
+        let runs = Array(styled.runs)
+        #expect(runs.count == 3)
+        #expect(runs[0].backgroundColor == nil && runs[0].font == nil)
+        #expect(runs[1].backgroundColor == Theme.inlineCodeBackground)
+        #expect(runs[1].font == Theme.codeFont(scale: 1))
+        #expect(runs[2].backgroundColor == nil)
+        #expect(String(styled.characters) == "run swift test now")
+        let plain = AttributedString("plain")
+        #expect(InlineCodeStyle.apply(plain, scale: 2) == plain)
+    }
+}
+
 @MainActor
 struct MainWindowLogicTests {
     let teams = [Team(id: "t1", name: "one", displayName: "One"), Team(id: "t2", name: "two", displayName: "Two")]

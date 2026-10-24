@@ -151,7 +151,7 @@ public enum DebugCommand: Equatable, Sendable {
             return .favorite(on: query["on"].map(flag) ?? true)
         case "collapse":
             guard let category = nonEmpty(query["category"]) else { return nil }
-            return .collapse(category: category, collapsed: query["on"].map(flag) ?? true)
+            return .collapse(category: category, collapsed: (query["collapsed"] ?? query["on"]).map(flag) ?? true)
         case "notification-click":
             guard let channel = nonEmpty(query["channel"]) else { return nil }
             return .notificationClick(server: index(query["server"]) ?? 0, team: query["team"] ?? "", channel: channel, root: query["root"] ?? "")

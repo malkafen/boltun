@@ -32,14 +32,14 @@ struct BlockView: View {
     var body: some View {
         switch block {
         case .paragraph(let text):
-            Text(text)
+            Text(InlineCodeStyle.apply(text, scale: effectiveScale))
                 .font(Theme.messageFont(scale: effectiveScale))
                 .foregroundStyle(Theme.textPrimary)
                 .lineSpacing(2)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
         case .heading(let level, let text):
-            Text(text)
+            Text(InlineCodeStyle.apply(text, scale: effectiveScale))
                 .font(.system(size: Self.headingSize(level: level) * effectiveScale, weight: .semibold))
                 .foregroundStyle(Theme.textPrimary)
                 .textSelection(.enabled)
@@ -80,6 +80,20 @@ struct BlockView: View {
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .help(alt)
         }
+    }
+}
+
+enum InlineCodeStyle {
+    static func apply(_ text: AttributedString, scale: Double) -> AttributedString {
+        let ranges = text.runs.compactMap { run in run.inlinePresentationIntent?.contains(.code) == true ? run.range : nil }
+        guard !ranges.isEmpty else { return text }
+        var styled = text
+        for range in ranges {
+            styled[range].font = Theme.codeFont(scale: scale)
+            styled[range].backgroundColor = Theme.inlineCodeBackground
+            styled[range].foregroundColor = Theme.inlineCodeText
+        }
+        return styled
     }
 }
 
@@ -139,7 +153,7 @@ struct TableBlockView: View {
     }
 
     func cellView(_ text: AttributedString, bold: Bool) -> some View {
-        Text(text)
+        Text(InlineCodeStyle.apply(text, scale: scale))
             .font(.system(size: 13 * scale, weight: bold ? .semibold : .regular))
             .foregroundStyle(Theme.textPrimary)
             .textSelection(.enabled)
