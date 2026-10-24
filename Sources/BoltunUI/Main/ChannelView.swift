@@ -114,15 +114,19 @@ struct ChannelHeader: View {
                     }
                     .buttonStyle(.plain)
                     .help(favorite ? "Remove from Favorites" : "Add to Favorites")
-                    if let count = workspace.memberCounts[channel.id] {
-                        Label("\(count)", systemImage: "person")
-                            .scaledFont(11.5, weight: .medium)
-                            .foregroundStyle(Theme.textSecondary)
-                            .help("\(count) members")
+                    if channel.type != .direct {
+                        ChannelMembersButton(count: workspace.memberCounts[channel.id], active: workspace.showsMembers) {
+                            workspace.toggleMembers()
+                        }
                     }
                     if session.isMuted(channelId: channel.id) {
                         MutedBellIcon(size: 11.5)
                             .help("Notifications are muted")
+                    }
+                    if workspace.isChannelFilesEnabled {
+                        ChannelFilesHeaderButton(active: workspace.channelFilesChannelId != nil) {
+                            Task { await workspace.toggleChannelFiles() }
+                        }
                     }
                     ChannelHeaderMenu(workspace: workspace, channel: channel)
                 }
@@ -152,6 +156,35 @@ struct ChannelHeader: View {
         let header = MessageRenderer.plainText(channel.header).replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
         if !header.isEmpty { return header }
         return channel.purpose.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
+    }
+}
+
+struct ChannelMembersButton: View {
+    let count: Int?
+    let active: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Label(count.map(String.init) ?? "-", systemImage: active ? "person.fill" : "person")
+                .scaledFont(11.5, weight: .medium)
+                .monospacedDigit()
+                .foregroundStyle(active ? Theme.link : hovering ? Theme.textPrimary : Theme.textSecondary)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(RoundedRectangle(cornerRadius: 4).fill(background))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Members")
+        .accessibilityLabel(count.map { "\($0) members" } ?? "Members")
+        .onHover { hovering = $0 }
+    }
+
+    private var background: Color {
+        if active { return Theme.link.opacity(0.16) }
+        return hovering ? Color.white.opacity(0.08) : .clear
     }
 }
 

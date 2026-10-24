@@ -70,11 +70,13 @@ public enum PreferenceCategory {
     public static let flaggedPost = "flagged_post"
     public static let theme = "theme"
     public static let sidebarSettings = "sidebar_settings"
+    public static let advancedSettings = "advanced_settings"
 }
 
 public enum PreferenceName {
     public static let nameFormat = "name_format"
     public static let limitVisibleDirectMessages = "limit_visible_dms_gms"
+    public static let unreadScrollPosition = "unread_scroll_position"
 }
 
 public struct ServerErrorBody: Codable, Hashable, Sendable {
@@ -125,8 +127,11 @@ public struct ClientConfig: Hashable, Sendable {
     public var enableOpenId: Bool { values["EnableSignUpWithOpenId"] == "true" }
     public var enableSaml: Bool { values["EnableSaml"] == "true" }
     public var enableCustomEmoji: Bool { values["EnableCustomEmoji"] == "true" }
+    public var enableFileAttachments: Bool { values["EnableFileAttachments"] != "false" }
 
     public var enableUserStatuses: Bool { values["EnableUserStatuses"] != "false" }
+    public var enableCustomUserStatuses: Bool { values["EnableCustomUserStatuses"] == "true" }
+    public var enableLastActiveTime: Bool { values["EnableLastActiveTime"] == "true" }
     public var collapsedThreads: String { values["CollapsedThreads"] ?? "disabled" }
     public var teammateNameDisplay: String { values["TeammateNameDisplay"] ?? "username" }
 }

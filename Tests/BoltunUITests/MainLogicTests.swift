@@ -388,27 +388,23 @@ import Testing
         #expect(!change([]))
         state.scrolled(atBottom: false)
         #expect(!change(["x", "b"]))
-        #expect(state.unseenCount == 2)
         #expect(!change(["c"]))
-        #expect(state.unseenCount == 3)
         #expect(change(["d"], mine: true))
-        #expect(state.unseenCount == 0)
-        state.scrolled(atBottom: false)
-        _ = change(["e"])
         state.scrolled(atBottom: true)
-        #expect(state.unseenCount == 0)
+        #expect(change(["e"]))
         state.scrolled(atBottom: false)
-        _ = change(["f"])
+        #expect(!change(["f"]))
         state.jumpedToBottom()
-        #expect(state.unseenCount == 0 && state.isAtBottom)
+        #expect(state.isAtBottom)
+        #expect(change(["g"]))
         func replace(_ list: [String]) -> Bool {
             state.postsChanged(postIds: list, lastIsMine: false)
         }
         #expect(!replace([]))
-        #expect(replace(["g"]))
+        #expect(replace(["h"]))
     }
 
-    @Test func olderPagesAreNotCountedAsUnseen() {
+    @Test func olderPagesDoNotFollow() {
         var state = ScrollFollowState()
         let latest = (300..<360).map { "p\($0)" }
         let initial = state.postsChanged(postIds: latest, lastIsMine: false)
@@ -417,18 +413,19 @@ import Testing
         let older = (0..<300).map { "p\($0)" } + latest
         let prepended = state.postsChanged(postIds: older, lastIsMine: false)
         #expect(!prepended)
-        #expect(state.unseenCount == 0)
-        let appended = state.postsChanged(postIds: older + ["n1", "n2", "n3"], lastIsMine: false)
+        let appended = state.postsChanged(postIds: older + ["n1"], lastIsMine: false)
         #expect(!appended)
-        #expect(state.unseenCount == 3)
-        let both = state.postsChanged(postIds: ["z"] + older + ["n1", "n2", "n3", "n4"], lastIsMine: false)
-        #expect(!both)
-        #expect(state.unseenCount == 4)
     }
 
     @Test func scrollMetrics() {
+        #expect(ScrollMetrics(distanceFromTop: 0, distanceFromBottom: 100).isAtBottom)
+        #expect(!ScrollMetrics(distanceFromTop: 0, distanceFromBottom: 101).isAtBottom)
         #expect(ScrollMetrics(distanceFromTop: 0, distanceFromBottom: 10).isAtBottom)
         #expect(!ScrollMetrics(distanceFromTop: 0, distanceFromBottom: 500).isAtBottom)
+        let visible = ScrollMetrics(distanceFromTop: 0, distanceFromBottom: 0, containerHeight: 400)
+        #expect(visible.isVisible(CGRect(x: 0, y: 50, width: 10, height: 20)))
+        #expect(!visible.isVisible(CGRect(x: 0, y: -30, width: 10, height: 20)))
+        #expect(!visible.isVisible(CGRect(x: 0, y: 400, width: 10, height: 20)))
         #expect(ScrollMetrics(distanceFromTop: 100, distanceFromBottom: 0).shouldLoadOlder)
         #expect(!ScrollMetrics(distanceFromTop: 5000, distanceFromBottom: 0).shouldLoadOlder)
     }
@@ -499,6 +496,64 @@ import Testing
         #expect(bottom.compensation(head: TimelineHead(timeline(["a", "b"])), old: atBottom, new: grown, settled: true) == nil)
         #expect(ScrollTracker.compensatedOffset(preserving: 100, in: ScrollMetrics(distanceFromTop: 0, distanceFromBottom: 100.5, contentHeight: 700, containerHeight: 600)) == nil)
         #expect(ScrollTracker.compensatedOffset(preserving: 900, in: ScrollMetrics(distanceFromTop: 0, distanceFromBottom: 0, contentHeight: 700, containerHeight: 600)) == 0)
+    }
+
+    @Test func alignmentSteps() {
+        let middle = ScrollMetrics(distanceFromTop: 800, distanceFromBottom: 400)
+        #expect(ScrollTracker.alignmentStep(frame: nil, metrics: middle) == .scrollToItem)
+        #expect(ScrollTracker.alignmentStep(frame: CGRect(x: 0, y: 50.5, width: 10, height: 10), metrics: middle) == .done)
+        #expect(ScrollTracker.alignmentStep(frame: CGRect(x: 0, y: 200, width: 10, height: 10), metrics: middle) == .scroll(950))
+        #expect(ScrollTracker.alignmentStep(frame: CGRect(x: 0, y: -100, width: 10, height: 10), metrics: middle) == .scroll(650))
+        #expect(ScrollTracker.alignmentStep(frame: CGRect(x: 0, y: -900, width: 10, height: 10), metrics: middle) == .scroll(0))
+        let bottom = ScrollMetrics(distanceFromTop: 800, distanceFromBottom: 0.5)
+        #expect(ScrollTracker.alignmentStep(frame: CGRect(x: 0, y: 300, width: 10, height: 10), metrics: bottom) == .done)
+        let top = ScrollMetrics(distanceFromTop: 0, distanceFromBottom: 400)
+        #expect(ScrollTracker.alignmentStep(frame: CGRect(x: 0, y: 10, width: 10, height: 10), metrics: top) == .done)
+    }
+
+    @Test func alignmentSearchesTowardsAnUnrenderedTarget() {
+        let metrics = ScrollMetrics(distanceFromTop: 1000, distanceFromBottom: 300, containerHeight: 500)
+        #expect(ScrollTracker.alignmentStep(frame: nil, metrics: metrics, targetIndex: 5, visible: 10...20) == .scroll(600))
+        #expect(ScrollTracker.alignmentStep(frame: nil, metrics: metrics, targetIndex: 25, visible: 10...20) == .scroll(1300))
+        #expect(ScrollTracker.alignmentStep(frame: nil, metrics: metrics, targetIndex: 15, visible: 10...20) == .scrollToItem)
+        #expect(ScrollTracker.alignmentStep(frame: nil, metrics: metrics, targetIndex: 5, visible: nil) == .scrollToItem)
+        let nearTop = ScrollMetrics(distanceFromTop: 100, distanceFromBottom: 900, containerHeight: 500)
+        #expect(ScrollTracker.alignmentStep(frame: nil, metrics: nearTop, targetIndex: 1, visible: 3...9) == .scroll(0))
+        let short = ScrollMetrics(distanceFromTop: 0, distanceFromBottom: 0, containerHeight: 0)
+        #expect(ScrollTracker.alignmentStep(frame: nil, metrics: short, targetIndex: 9, visible: 0...3) == .scroll(0))
+    }
+
+    @Test func visibleRangeFollowsTimelineOrder() {
+        let tracker = ScrollTracker()
+        let items: [TimelineItem] = [.date("Today"), .newMessages, .replies(1)]
+        #expect(tracker.visibleRange(in: items) == nil)
+        tracker.visibleIds = ["replies", "new-messages", "unknown"]
+        #expect(tracker.visibleRange(in: items) == 1...2)
+    }
+
+    @Test func liveFrameIgnoresFramesOfRowsThatAreNotVisibleWhenVisibilityIsKnown() {
+        let tracker = ScrollTracker()
+        tracker.frames["new-messages"] = CGRect(x: 0, y: -3200, width: 100, height: 20)
+        #expect(tracker.liveFrame(of: "new-messages")?.minY == -3200)
+        tracker.visibleIds = ["post-1"]
+        #expect(tracker.liveFrame(of: "new-messages") == nil)
+        tracker.visibleIds = ["new-messages"]
+        #expect(tracker.liveFrame(of: "new-messages")?.minY == -3200)
+        #expect(tracker.liveFrame(of: "missing") == nil)
+    }
+
+    @Test func timelineReadinessAndToastSignature() {
+        var timeline = timeline(["a", "b"], loading: true)
+        #expect(!TimelineReadiness(timeline).isReady)
+        timeline.isLoading = false
+        #expect(TimelineReadiness(timeline).isReady)
+        timeline.loaded = false
+        #expect(!TimelineReadiness(timeline).isReady)
+        let signature = ToastSignature(timeline)
+        timeline.lastViewedAtOnOpen = 5
+        #expect(ToastSignature(timeline) != signature)
+        #expect(ToastSignature(timeline).postCount == 2)
+        #expect(ToastSignature(timeline).lastPostId == "b")
     }
 
     @Test func serverTiles() {

@@ -35,6 +35,10 @@ enum TimeFormatting {
         return short(date, now: now, calendar: calendar)
     }
 
+    static func format(_ date: Date, _ pattern: String, calendar: Calendar) -> String {
+        formatter(pattern, calendar: calendar).string(from: date)
+    }
+
     private static let cache = FormatterCache()
 
     private static func formatter(_ format: String, calendar: Calendar) -> DateFormatter {

@@ -33,6 +33,8 @@ extension Theme {
     public static let border = Color.white.opacity(0.12)
     public static let inputBackground = Color(red: 0.10, green: 0.11, blue: 0.13)
     public static let newMessages = Color(red: 0.94, green: 0.40, blue: 0.34)
+    public static let toastHistory = Color(red: 0.85, green: 0.85, blue: 0.85)
+    public static let toastHistoryText = Color(red: 0.24, green: 0.24, blue: 0.25)
     public static let link = Color(red: 0.42, green: 0.62, blue: 1.0)
     public static let linkHover = Color(red: 0.42, green: 0.62, blue: 1.0).opacity(0.16)
     public static let mentionBadge = Color(red: 0.86, green: 0.27, blue: 0.29)

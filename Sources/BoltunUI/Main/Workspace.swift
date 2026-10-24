@@ -7,6 +7,8 @@ import Observation
 enum RightPane: Equatable {
     case thread(String)
     case search
+    case members
+    case channelFiles(String)
 }
 
 struct ComposerTarget: Hashable, Sendable {
@@ -65,6 +67,13 @@ final class Workspace {
     var highlightedPostId: String?
     var searchFocusRequest = 0
     var threadSeenAt: [String: Int64] = [:]
+    var profilePopover: ProfilePresentation?
+    @ObservationIgnored var membersPanel: ChannelMembersModel?
+    @ObservationIgnored var membersSearchDebounce: Duration = .milliseconds(100)
+    var preparingPreviews: Set<String> = []
+    @ObservationIgnored let channelFiles: ChannelFilesModel
+    @ObservationIgnored var quickLook: (URL) -> Void = { QuickLookPanel.shared.preview($0) }
+    @ObservationIgnored var previewDirectory: URL = FileManager.default.temporaryDirectory.appending(path: "Boltun Previews")
     @ObservationIgnored var scrollReport = ScrollReport()
     @ObservationIgnored var scrollSequence = 0
     @ObservationIgnored var handledScrollSequence = 0
@@ -90,9 +99,15 @@ final class Workspace {
     @ObservationIgnored var openExternal: (URL) -> Void = { NSWorkspace.shared.open($0) }
     @ObservationIgnored var revealInFinder: (URL) -> Void = { NSWorkspace.shared.activateFileViewerSelecting([$0]) }
 
+    let channelToast: ChannelToastModel
+
     init(session: ServerSession, serverURL: URL) {
         self.session = session
         self.serverURL = serverURL
+        channelToast = ChannelToastModel(session: session)
+        channelFiles = ChannelFilesModel { query, page in await session.searchChannelFiles(query, page: page) }
+        channelToast.requestScroll = { [weak self] target in self?.requestScroll(target) }
+        channelToast.now = { [weak self] in self?.now() ?? Date() }
     }
 
     func composer(for target: ComposerTarget) -> ComposerState {

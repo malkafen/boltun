@@ -42,7 +42,7 @@ From the Linux dev host, run the same commands through `ssh macbox@192.168.5.90`
 
 | Command | Effect |
 | --- | --- |
-| `snapshot?path=/tmp/x.png[&window=main\|sheet\|settings\|key]` | Renders a window to PNG. `sheet` is the sheet attached to the main window. |
+| `snapshot?path=/tmp/x.png[&window=main\|sheet\|settings\|key\|popover]` | Renders a window to PNG. `sheet` is the sheet attached to the main window. `popover` renders the main window with every open popover drawn over it at its screen position, so the profile popover can be captured without screen recording access. |
 | `state?path=/tmp/x.json` | Dumps servers, connection states, selected team and channel, unread and mention counts, visible post count, badge, open sheet and window visibility. |
 | `add-server?url=<url>[&name=<name>]` | Validates the server and adds it. The site name is used when `name` is omitted. |
 | `login?server=<index>&user=<login>&password=<password>` | Logs in to the server at the given index (default 0). |
@@ -77,6 +77,7 @@ from the newest regular post, so `index=0` is the last one.
 | `open-thread[?index=<n>][&post=<id>]` | Opens the thread of a post in the right pane. |
 | `close-pane` | Closes the right pane. |
 | `scroll?to=top\|bottom\|<post id>` | Scrolls the message list to an edge, or centers and highlights a post. |
+| `toast?action=jump\|dismiss\|escape` | Acts on the message list toast: `jump` clicks it (Jump to recents, Jump to new messages or Jump to unreads), `dismiss` clicks its close button and `escape` presses Esc in the window. The detail is the kind of toast shown afterwards, or `none`. Fails with `no toast` when nothing is shown for `jump` and `dismiss`. |
 | `quickswitch[?query=<text>][&choose=1][&close=1]` | Opens the quick switcher with a query; `choose=1` opens the first result and `close=1` hides it. |
 | `search?q=<terms>` | Runs a message search. The detail is the number of results. |
 | `jump[?index=<n>]` | Jumps to a search result. |
@@ -101,23 +102,71 @@ from the newest regular post, so `index=0` is the last one.
 | `reveal[?index=<n>][&post=<id>]` | Reveals a burn-on-read message you received, as clicking "View message" does. The detail is the resulting revealed state. |
 | `burn[?index=<n>][&post=<id>]` | Deletes a burn-on-read message for everyone, as confirming the fire badge does. |
 | `set-status?status=online\|away\|dnd\|offline` | Sets your own status, as the avatar menu in the sidebar header does. The detail is the resulting status. |
+| `channel-files[?on=0]` | Opens the Files pane for the current channel, as the "Channel files" header button does, or closes it with `on=0`. Fails when the server disables file attachments. The detail is the number of loaded files. |
+| `channel-files-filter?type=all\|documents\|spreadsheets\|presentations\|code\|images\|audio\|video` | Picks a file type in the pane's filter menu (`videos` is accepted too) and reloads the list. The detail is the number of loaded files. |
+| `channel-files-search[?q=<text>]` | Searches files in the pane's channel, as typing in "Search files" and pressing Return does. Without `q` the search is cleared and the recent files come back. |
+| `channel-files-more` | Loads the next page, as scrolling to the last row does. Nothing happens once the list is at its end. |
+| `channel-file?index=<n>[&action=preview\|open\|download\|copy-link]` | Acts on the n-th row (0-based) of the pane. `preview` (the default) opens images in the image preview sheet and other files in Quick Look; the detail is `image-preview` or `quick-look:<path>`. `open` jumps to the file's post ("Open in channel"), `download` saves it to Downloads, and `copy-link` copies the post permalink and returns it. |
+| `quick-look-close` | Closes the Quick Look panel. |
 | `command?name=<name>[&number=<n>]` | Runs a menu or keyboard command, listed below. |
 
 `command` names: `focus-search`, `focus-composer`, `quick-switcher`, `toggle-sidebar`, `toggle-pane`, `zoom-in`,
 `zoom-out`, `zoom-reset`, `next-server`, `previous-server`, `server` (with `number`, 1-based), `next-channel`,
 `previous-channel`, `next-unread`, `browse`, `direct-messages`, `close-sheets` and `preview-last-image`.
 
+### Profiles and channel members
+
+| Command | Effect |
+| --- | --- |
+| `members[?on=0\|1]` | Toggles the Members right pane of the current channel, as clicking the member count in the channel header does. `on=1` only opens it and `on=0` only closes it. Direct messages have no members pane. After opening, the command waits for the first page. The detail is the number of listed members. |
+| `members-search?q=<term>` | Types into the "Search members" field of the open pane and waits for the debounced server search. An empty `q` clears the search. The detail is the number of listed members. |
+| `members-more` | Loads the next page of members, as scrolling to the end of the list does. The detail is the number of loaded profiles. |
+| `member-message?user=<username>` | Clicks "Send message" on a member row: opens the direct message and closes the pane. The detail is the resulting channel id. |
+| `profile[?in=channel\|thread\|search\|members][&target=avatar\|name\|mention\|member][&index=<n>][&post=<id>][&user=<username>]` | Opens the profile popover the way a click does. `in=channel` (the default) and `in=thread` use post indexes counted back from the newest regular post (of the open thread for `thread`); `in=search` uses the 0-based search result index. `target=mention` needs `user`, the mentioned name as written after `@`, and anchors the popover to the message text. `in=members` (target `member`) needs `user` and the open members pane. The command waits until the profile, status and memberships are loaded. The detail is the user id. |
+| `profile?close=1` | Closes the profile popover. |
+| `profile-message` | Clicks "Message" (or "Send yourself a message") in the open popover. The detail is the resulting channel id. |
+
 ### UI state
 
 `state` lists teams in sidebar order with `favoriteTeams` and `mutedTeams`, and also writes a `ui` object for the selected workspace. It includes the window title, first responder, open right
 pane and thread posts, quick switcher and search results, the highlighted post, the scroll report (distances from
-the top and bottom, content height, unseen count for the new-messages pill, older-page requests), timeline size and paging flags, the last posts with reactions and files, both composers (text, editing post,
+the top and bottom, content and container height, older-page requests and the unread positioning described below), timeline size and paging flags, the last posts with reactions and files, both composers (text, editing post,
 suggestions, uploads, height), typing users, unread and mention channels, favorites, `mutedChannels`, collapsed categories, open sheets,
 the last session error, the workspace and cached post counts, `editors`, the spell-checking and font size of every
 live composer text view, `collapsedThreads`, `myStatus` and `threadFollowing` for the open thread. Post summaries carry
 `replyCount`, the author's `status` and, for root posts, `following`. `sidebar` lists the channel sidebar categories in
 order with their `id`, `title`, `type`, effective `sorting` (`alpha`, `recent` or `manual`), `collapsed` flag and the
 display names of their `channels` in sidebar order.
+
+Unread positioning and the message list toast follow the Mattermost webapp. When a channel opens with unread posts, the
+list is positioned so that the "New Messages" separator (or the date line directly above it) sits 50 points below the
+top, leaving room for the toast, instead of starting at the bottom. With the `advanced_settings` /
+`unread_scroll_position` preference set to `start_from_newest` the list starts at the bottom and offers "Jump to
+unreads" instead. The scroll report carries `initialTarget` (`bottom`, or the id of the item aligned to the top),
+`positioned` (true once the initial or focus positioning has settled) and `newMessagesLineTop` (the separator's offset
+from the top of the visible area while it is rendered). `lastViewedAtOnOpen` is the last-viewed time captured when the
+channel opened, which places the separator and is moved forward when new posts arrive while scrolled up. `toast` is
+absent when no toast is shown; otherwise it has `kind` (`unread`, `unreadWithBottomStart`, `newMessages`, `history` or
+`scrollToBottom`), the rendered `message` (for example `60 new messages today`), the visible `action` label (absent when
+the list is narrower than 769 points or the toast is passive at the bottom), `showActions`, `count` and `since` (the
+last-viewed time in milliseconds).
+
+`rightPane` is `members` while the Members pane is open. `profile` describes the open profile popover: `anchor`
+(`<surface>:<target>:<post or user id>`), `userId`, `loaded` (false until the user's profile is known) and, once loaded,
+`username`, `fullName`, `role` (`BOT`, `GUEST`, `System Admin`, `Team Admin` or `Channel Admin`), `botDescription`,
+`position`, `email`, `localTime` (title, time and offset), `customStatus` (emoji, text and expiry), `lastOnline`,
+`status`, `disclaimer` (webhook posts), `isSelf` and `button` (`Message`, `Send yourself a message` or absent).
+`members` describes the open pane: `channel`, `count` (the header member count), `loaded` (profiles fetched by
+paging), `searchVisible`, `search`, `searching`, `canLoadMore` and up to 80 `items`, which are the section titles
+(`CHANNEL ADMINS`, `MEMBERS`) and rows as `Display Name @username [status]`.
+
+`rightPane` is `channel-files:<channel id>` while the Files pane is open. `channelFiles` describes the pane: `enabled`
+(the server allows file attachments, so the header button shows), `open`, `channelId`, `channel`, the section `title`
+(`Recent files` or `Search Results`), `filter` and `filterTitle`, the applied `query`, the search `terms` sent to the
+server, `loading`, `loadingMore`, `atEnd`, `nextPage`, `count`, the `empty` and `emptyDetail` texts when the empty state
+shows, the first 40 `files` (`id`, `name`, `kind`, `size`, `date`, the `Direct Message`/`Group Message`
+`tag`, `postId` and whether a `thumbnail` image is used), `preparingPreviews` (file ids being fetched for Quick Look)
+and `quickLook`, the path shown in a visible Quick Look panel.
 
 Message read information is reported too. `readInfo` names the server-side gating (`postPriority`,
 `acknowledgements`, `persistentNotifications`, `burnOnRead` and the `licenseSku` they come from). Post summaries carry

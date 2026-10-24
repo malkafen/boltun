@@ -134,7 +134,7 @@ enum TimelineBuilder {
                 }
                 breaksGroup = true
             }
-            if !insertedNewLine, context.lastViewedAt > 0, post.createAt > context.lastViewedAt, post.userId != context.myId {
+            if !insertedNewLine, NewMessagesMarker.starts(at: post, lastViewedAt: context.lastViewedAt, myId: context.myId) {
                 result.append(.newMessages)
                 insertedNewLine = true
                 breaksGroup = true

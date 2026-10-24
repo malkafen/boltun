@@ -143,6 +143,9 @@ struct WorkspaceView: View {
         .onChange(of: workspace.rightPane != nil, initial: true) { _, visible in
             if router?.isThreadPaneVisible != visible { router?.isThreadPaneVisible = visible }
         }
+        .onChange(of: workspace.session.currentChannelId) { _, channelId in
+            Task { await workspace.followChannelFiles(to: channelId) }
+        }
     }
 }
 

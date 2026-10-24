@@ -6,6 +6,7 @@ struct ScrollRequest: Equatable {
         case top
         case bottom
         case post(String)
+        case newMessages
     }
 
     var channelId: String
@@ -18,8 +19,11 @@ struct ScrollReport: Equatable, Codable, Sendable {
     var distanceFromTop: Double = 0
     var distanceFromBottom: Double = 0
     var contentHeight: Double = 0
-    var unseenCount = 0
+    var containerHeight: Double = 0
     var loadOlderRequests = 0
+    var initialTarget = ""
+    var positioned = false
+    var newMessagesLineTop: Double?
 }
 
 extension Workspace {

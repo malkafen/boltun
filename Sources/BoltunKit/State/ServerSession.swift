@@ -23,6 +23,7 @@ public struct ChannelTimeline: Equatable, Sendable {
     public var isLoading = false
     public var loaded = false
     public var lastViewedAtOnOpen: Int64 = 0
+    public var unreadCountOnOpen = 0
 
     public init() {}
 }
@@ -68,6 +69,9 @@ public final class ServerSession {
     public internal(set) var revealingPostIds: Set<String> = []
     public internal(set) var readCounts: [String: [MemberReadCount]] = [:]
     public internal(set) var readStatusEnabled = true
+    public internal(set) var channelRoster: [String: [String: ChannelMember]] = [:]
+    public internal(set) var teamRoster: [String: [String: TeamMember]] = [:]
+    public internal(set) var lastActivity: [String: Int64] = [:]
     public var teamLayout = TeamLayout() {
         didSet { if teamLayout != oldValue { onTeamLayoutChange?(teamLayout) } }
     }
@@ -93,6 +97,8 @@ public final class ServerSession {
     @ObservationIgnored var readStatusRestartPending = false
     @ObservationIgnored var requestedStatsChannelIds = Set<String>()
     @ObservationIgnored var requestedStatusIds = Set<String>()
+    @ObservationIgnored var refreshedProfileIds = Set<String>()
+    @ObservationIgnored var requestedMemberships = Set<String>()
     @ObservationIgnored let realtimeFactory: (URL, String) -> RealtimeClient
     @ObservationIgnored var realtime: RealtimeClient?
     @ObservationIgnored var realtimeTask: Task<Void, Never>?
@@ -107,6 +113,7 @@ public final class ServerSession {
     @ObservationIgnored var staleCategoryTeams = Set<String>()
     @ObservationIgnored var categoryRevisions: [String: Int] = [:]
     @ObservationIgnored let pageSize: Int
+    @ObservationIgnored public var unreadPageLimit = 10
 
     public init(
         serverId: UUID,
@@ -261,6 +268,7 @@ public final class ServerSession {
         guard let current, let existing = timelines[current] else { return }
         var reset = ChannelTimeline()
         reset.lastViewedAtOnOpen = existing.lastViewedAtOnOpen
+        reset.unreadCountOnOpen = existing.unreadCountOnOpen
         timelines[current] = reset
         await loadLatest(channelId: current)
     }
@@ -462,6 +470,7 @@ public final class ServerSession {
         onSelectionChange?(currentTeamId, channelId)
         var timeline = timelines[channelId] ?? ChannelTimeline()
         timeline.lastViewedAtOnOpen = members[channelId]?.lastViewedAt ?? 0
+        timeline.unreadCountOnOpen = unreadMessageCount(channelId: channelId)
         timelines[channelId] = timeline
         if let teamId = currentTeamId, !loadedTeams.contains(teamId), teams.contains(where: { $0.id == teamId }) {
             do {
@@ -475,6 +484,7 @@ public final class ServerSession {
         } else {
             await loadLatest(channelId: channelId)
         }
+        await loadUnreadPosts(channelId: channelId)
         guard currentChannelId == channelId else { return }
         let previousChannel = previousId == channelId ? "" : (previousId ?? "")
         async let viewed: Void = markViewed(channelId: channelId, previous: previousChannel)
@@ -940,7 +950,10 @@ public final class ServerSession {
 
     public func refreshStatuses(_ ids: [String]) async {
         guard !ids.isEmpty, let found = await quietly({ try await client.statuses(userIds: ids) }) else { return }
-        for status in found where statuses[status.userId] != status.status { statuses[status.userId] = status.status }
+        for status in found {
+            if statuses[status.userId] != status.status { statuses[status.userId] = status.status }
+            if lastActivity[status.userId] != status.lastActivityAt { lastActivity[status.userId] = status.lastActivityAt }
+        }
     }
 
     func refreshTeamUnreads() async {

@@ -7,6 +7,7 @@ public enum DebugCommand: Equatable, Sendable {
         case sheet
         case settings
         case key
+        case popover
     }
 
     case snapshot(path: String, window: WindowTarget)
@@ -60,6 +61,27 @@ public enum DebugCommand: Equatable, Sendable {
     case channelMove(channel: String, category: String?, index: Int?)
     case categoryMove(category: String, index: Int)
     case categorySort(category: String, sorting: CategorySorting)
+    case toast(action: ToastAction)
+
+    public enum ToastAction: String, Equatable, Sendable {
+        case jump
+        case dismiss
+        case escape
+    }
+
+    case members(on: Bool?)
+    case membersSearch(query: String)
+    case membersMore
+    case memberMessage(username: String)
+    case profile(ProfileTarget?)
+    case profileMessage
+
+    case channelFiles(on: Bool)
+    case channelFilesFilter(FileTypeFilter)
+    case channelFilesSearch(String)
+    case channelFilesMore
+    case channelFile(index: Int, action: ChannelFileAction)
+    case quickLookClose
 
     public enum TeamMoveTarget: Equatable, Sendable {
         case team(String)
@@ -245,8 +267,11 @@ public enum DebugCommand: Equatable, Sendable {
         case "category-sort":
             guard let category = nonEmpty(query["category"]), let sorting = query["sorting"].flatMap(categorySorting) else { return nil }
             return .categorySort(category: category, sorting: sorting)
+        case "toast":
+            guard let toastAction = query["action"].flatMap(ToastAction.init(rawValue:)) else { return nil }
+            return .toast(action: toastAction)
         default:
-            return nil
+            return makeProfile(action: action, query: query) ?? makeChannelFiles(action: action, query: query)
         }
     }
 

@@ -10,6 +10,8 @@ struct RightPaneView: View {
             switch workspace.rightPane {
             case .thread(let rootId): ThreadPane(workspace: workspace, rootId: rootId)
             case .search: SearchPane(workspace: workspace)
+            case .members: ChannelMembersPane(workspace: workspace)
+            case .channelFiles(let channelId): ChannelFilesPane(workspace: workspace, channelId: channelId)
             case nil: EmptyView()
             }
         }
@@ -147,38 +149,50 @@ struct SearchResultRow: View {
         let session = workspace.session
         let channel = session.channels[post.channelId]
         let blocks = workspace.renderCache.blocks(for: post, context: workspace.markupContext())
-        Button {
-            Task { await workspace.jump(to: post) }
-        } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 4) {
-                    if let channel { ChannelGlyph(channel: channel, session: session, size: 10) }
-                    Text(channel.map { session.displayName(channel: $0) } ?? "Unknown channel")
-                        .scaledFont(11, weight: .semibold)
-                        .foregroundStyle(Theme.textSecondary)
-                    Spacer()
-                    Text(TimeFormatting.short(post.createAt.mattermostDate, now: workspace.now(), calendar: workspace.calendar))
-                        .scaledFont(11)
-                        .foregroundStyle(Theme.textSecondary)
+        let request = workspace.profileRequest(for: post)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                if let channel { ChannelGlyph(channel: channel, session: session, size: 10) }
+                Text(channel.map { session.displayName(channel: $0) } ?? "Unknown channel")
+                    .scaledFont(11, weight: .semibold)
+                    .foregroundStyle(Theme.textSecondary)
+                Spacer()
+                Text(TimeFormatting.short(post.createAt.mattermostDate, now: workspace.now(), calendar: workspace.calendar))
+                    .scaledFont(11)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            HStack(alignment: .top, spacing: 8) {
+                profileTrigger(.avatar, request: request) {
+                    Avatar(url: session.client.profileImageURL(userId: post.userId, lastPictureUpdate: session.users[post.userId]?.lastPictureUpdate ?? 0), client: session.client, name: session.displayName(for: post), size: 28, status: post.overrideUsername == nil ? session.statuses[post.userId] : nil, statusRing: hovering ? Theme.hover : Theme.content)
                 }
-                HStack(alignment: .top, spacing: 8) {
-                    Avatar(url: session.client.profileImageURL(userId: post.userId, lastPictureUpdate: session.users[post.userId]?.lastPictureUpdate ?? 0), client: session.client, name: session.displayName(for: post), size: 28, status: post.overrideUsername == nil ? session.statuses[post.userId] : nil, statusRing: Theme.content)
-                    VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 2) {
+                    profileTrigger(.name, request: request) {
                         Text(session.displayName(for: post)).scaledFont(13, weight: .semibold).foregroundStyle(Theme.textPrimary)
-                        MessageBody(blocks: blocks, client: session.client)
-                            .lineLimit(6)
                     }
+                    MessageBody(blocks: blocks, client: session.client)
+                        .lineLimit(6)
+                        .mentionProfiles(workspace: workspace, anchor: ProfileAnchor(surface: .search, kind: .mention, id: post.id), channelId: post.channelId)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(hovering ? Theme.hover : .clear)
-            .overlay(alignment: .bottom) { Rectangle().fill(Theme.separator).frame(height: 1) }
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(hovering ? Theme.hover : .clear)
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.separator).frame(height: 1) }
+        .contentShape(Rectangle())
+        .onTapGesture { Task { await workspace.jump(to: post) } }
         .onHover { hovering = $0 }
+        .accessibilityAddTraits(.isButton)
+    }
+
+    @ViewBuilder
+    func profileTrigger<Label: View>(_ kind: ProfileAnchor.Kind, request: ProfilePopoverRequest?, @ViewBuilder label: @escaping () -> Label) -> some View {
+        if let request {
+            ProfilePopoverTrigger(workspace: workspace, anchor: ProfileAnchor(surface: .search, kind: kind, id: post.id), request: request, arrowEdge: .leading, label: label)
+        } else {
+            label()
+        }
     }
 }
 

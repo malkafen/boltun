@@ -18,6 +18,7 @@ struct AppDebugCommandTests {
     @Test func parsesSnapshot() {
         #expect(command("boltun://debug/snapshot?path=/tmp/a.png") == .snapshot(path: "/tmp/a.png", window: .main))
         #expect(command("boltun://debug/snapshot?path=/tmp/x/b.png&window=settings") == .snapshot(path: "/tmp/x/b.png", window: .settings))
+        #expect(command("boltun://debug/snapshot?path=/tmp/x/c.png&window=popover") == .snapshot(path: "/tmp/x/c.png", window: .popover))
         #expect(command("boltun://debug/snapshot?path=/tmp/a.png&window=bogus") == .snapshot(path: "/tmp/a.png", window: .main))
         #expect(command("boltun://debug/snapshot?path=/etc/passwd") == nil)
         #expect(command("boltun://debug/snapshot") == nil)

@@ -8,8 +8,20 @@ struct TimelineItemView: View {
     let workspace: Workspace
     var inThread = false
     var highlightedPostId: String?
+    var onFrame: ((String, CGRect?) -> Void)?
 
     var body: some View {
+        if let onFrame {
+            content
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .scrollView) } action: { [id = item.id] in onFrame(id, $0) }
+                .onDisappear { [id = item.id] in onFrame(id, nil) }
+        } else {
+            content
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         switch item {
         case .date(let title):
             DateSeparator(title: title)
@@ -165,15 +177,30 @@ struct MessageRow: View, Equatable {
                 .opacity(hovering ? 1 : 0)
                 .help(model.fullTimeText)
         } else {
-            Avatar(url: model.avatarURL, client: workspace.session.client, name: model.authorName, size: 36, status: model.authorStatus, statusRing: Theme.content)
+            profileTrigger(.avatar) {
+                Avatar(url: model.avatarURL, client: workspace.session.client, name: model.authorName, size: 36, status: model.authorStatus, statusRing: Theme.content)
+            }
+        }
+    }
+
+    var profileSurface: ProfileAnchor.Surface { inThread ? .thread : .channel }
+
+    @ViewBuilder
+    func profileTrigger<Label: View>(_ kind: ProfileAnchor.Kind, @ViewBuilder label: @escaping () -> Label) -> some View {
+        if !model.isSystem, let request = workspace.profileRequest(for: post) {
+            ProfilePopoverTrigger(workspace: workspace, anchor: ProfileAnchor(surface: profileSurface, kind: kind, id: post.id), request: request, label: label)
+        } else {
+            label()
         }
     }
 
     var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text(model.isSystem ? "System" : model.authorName)
-                .scaledFont(13.5, weight: .semibold)
-                .foregroundStyle(Theme.textPrimary)
+            profileTrigger(.name) {
+                Text(model.isSystem ? "System" : model.authorName)
+                    .scaledFont(13.5, weight: .semibold)
+                    .foregroundStyle(Theme.textPrimary)
+            }
             if post.overrideUsername != nil || post.props["from_bot"]?.boolValue == true {
                 Text("BOT")
                     .scaledFont(9, weight: .bold)
@@ -218,6 +245,7 @@ struct MessageRow: View, Equatable {
         } else if !model.blocks.isEmpty || post.isEdited {
             VStack(alignment: .leading, spacing: 2) {
                 MessageBody(blocks: model.blocks, client: workspace.session.client)
+                    .mentionProfiles(workspace: workspace, anchor: ProfileAnchor(surface: profileSurface, kind: .mention, id: post.id), channelId: post.channelId)
                 if post.isEdited {
                     Text("Edited")
                         .scaledFont(10.5)
