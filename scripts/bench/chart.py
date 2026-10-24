@@ -78,13 +78,12 @@ def usage(apps, out):
            f'<rect class="surface" fill="#fcfcfb" width="{W}" height="{H}" rx="8"/>',
            f'<text class="ink" fill="#0b0b0b" x="{LEFT}" y="26" font-size="15" font-weight="600">The whole scenario: memory and CPU time</text>']
     legend(svg, LEFT, 44)
-    previous, raised = -1e9, False
-    for t, (_, name) in zip(marks, PHASES):
-        raised = x(t) - previous < 70 and not raised
-        previous = x(t)
-        ly = TOP - 26 if raised else TOP - 12
-        svg.append(f'<line class="phase" stroke="#c9c8c2" stroke-dasharray="3 4" x1="{x(t):.1f}" x2="{x(t):.1f}" y1="{ly + 4}" y2="{TOP + 2 * PANEL + GAP - 24}"/>')
-        svg.append(f'<text class="muted" fill="#52514e" x="{x(t) + 4:.1f}" y="{ly}">{name}</text>')
+    positions = [x(t) for t in marks]
+    for k, (px, (_, name)) in enumerate(zip(positions, PHASES)):
+        crowded = k + 1 < len(positions) and positions[k + 1] - px < 70
+        anchor, tx, ly = ("end", px - 4, TOP - 26) if crowded else ("start", px + 4, TOP - 12)
+        svg.append(f'<line class="phase" stroke="#c9c8c2" stroke-dasharray="3 4" x1="{px:.1f}" x2="{px:.1f}" y1="{ly + 4}" y2="{TOP + 2 * PANEL + GAP - 24}"/>')
+        svg.append(f'<text class="muted" fill="#52514e" x="{tx:.1f}" y="{ly}" text-anchor="{anchor}">{name}</text>')
 
     def panel(y0, title, idx, unit, f):
         vmax = max(p[idx] for _, pts in series for p in pts) * 1.05

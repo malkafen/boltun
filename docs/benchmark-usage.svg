@@ -13,15 +13,15 @@
 <rect class="f1" fill="#2a78d6" x="286.8" y="38" width="14" height="4" rx="2"/>
 <text class="muted" fill="#52514e" x="306.8" y="44">Boltun</text>
 <line class="phase" stroke="#c9c8c2" stroke-dasharray="3 4" x1="65.9" x2="65.9" y1="76" y2="570"/>
-<text class="muted" fill="#52514e" x="69.9" y="72">idle</text>
+<text class="muted" fill="#52514e" x="69.9" y="72" text-anchor="start">idle</text>
 <line class="phase" stroke="#c9c8c2" stroke-dasharray="3 4" x1="145.9" x2="145.9" y1="76" y2="570"/>
-<text class="muted" fill="#52514e" x="149.9" y="72">switches</text>
-<line class="phase" stroke="#c9c8c2" stroke-dasharray="3 4" x1="227.6" x2="227.6" y1="76" y2="570"/>
-<text class="muted" fill="#52514e" x="231.6" y="72">history</text>
-<line class="phase" stroke="#c9c8c2" stroke-dasharray="3 4" x1="244.3" x2="244.3" y1="62" y2="570"/>
-<text class="muted" fill="#52514e" x="248.3" y="58">live traffic</text>
+<text class="muted" fill="#52514e" x="149.9" y="72" text-anchor="start">switches</text>
+<line class="phase" stroke="#c9c8c2" stroke-dasharray="3 4" x1="227.6" x2="227.6" y1="62" y2="570"/>
+<text class="muted" fill="#52514e" x="223.6" y="58" text-anchor="end">history</text>
+<line class="phase" stroke="#c9c8c2" stroke-dasharray="3 4" x1="244.3" x2="244.3" y1="76" y2="570"/>
+<text class="muted" fill="#52514e" x="248.3" y="72" text-anchor="start">live traffic</text>
 <line class="phase" stroke="#c9c8c2" stroke-dasharray="3 4" x1="489.9" x2="489.9" y1="76" y2="570"/>
-<text class="muted" fill="#52514e" x="493.9" y="72">idle</text>
+<text class="muted" fill="#52514e" x="493.9" y="72" text-anchor="start">idle</text>
 <text class="ink" fill="#0b0b0b" x="64" y="94" font-weight="600">Memory (all processes, physical footprint)</text>
 <line class="grid" stroke="#e4e3df" x1="64" x2="650" y1="304.0" y2="304.0"/>
 <text class="muted" fill="#52514e" x="56" y="308.0" text-anchor="end">0</text>
