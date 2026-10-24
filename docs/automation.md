@@ -49,13 +49,57 @@ From the Linux dev host, run the same commands through `ssh macbox@192.168.5.90`
 | `logout?server=<index>` | Logs out of a server. |
 | `select?server=<index>[&team=<name>][&channel=<name>]` | Selects a server, and optionally a team and channel by name or display name. |
 | `open?url=<percent-encoded url>` | Routes a `mattermost://`, `boltun://` or `https://` link as if it was opened from outside. |
-| `present?sheet=add-server\|login[&server=<index>]` | Presents the add-server or login sheet. |
+| `remove-server?server=<index>` | Removes the server at the given index, as the Settings window does. |
+| `setting?name=spellChecking&value=0\|1` | Changes a preference. `spellChecking` is the only supported name. |
+| `present?sheet=add-server\|login\|browse\|dm[&server=<index>]` | Presents the add-server, login, browse-channels or direct-messages sheet. |
 | `dismiss` | Dismisses the current sheet. |
 | `settings[?tab=servers\|general\|about]` | Opens the Settings window on a tab. |
 | `show` | Shows the main window. |
 | `close` | Closes the main window, which hides it while the app keeps running. |
 | `notify[?title=..&body=..]` | Delivers a test notification for the current channel. |
 | `quit` | Terminates the app. |
+
+### Workspace interaction
+
+These commands act on the selected server's current channel. Commands that take `thread=1` target the reply composer
+of the open thread instead of the channel composer. Flags accept `1`, `true`, `yes` or `on`. Post indexes count back
+from the newest regular post, so `index=0` is the last one.
+
+| Command | Effect |
+| --- | --- |
+| `send?text=<text>[&thread=1]` | Puts the text into the composer and sends it through the same queue as Enter. The log detail carries the session error, if any. |
+| `type?text=<text>[&thread=1]` | Replaces the composer text, focuses it and emits a typing event, so autocomplete suggestions appear. |
+| `key?name=enter\|up\|down\|tab\|escape[&mods=shift,option,command,control][&thread=1]` | Routes a key press through the composer key handling. The detail names the resulting action. |
+| `upload?path=/tmp/<file>[&thread=1]` | Attaches a file to the composer. Send it afterwards with `send` or `key?name=enter`. |
+| `edit-last?text=<text>` | Edits your newest post in the channel. |
+| `delete-last` | Deletes your newest post in the channel. |
+| `react?emoji=<name>[&index=<n>]` | Toggles a reaction on a post. |
+| `open-thread[?index=<n>][&post=<id>]` | Opens the thread of a post in the right pane. |
+| `close-pane` | Closes the right pane. |
+| `scroll?to=top\|bottom\|<post id>` | Scrolls the message list to an edge, or centers and highlights a post. |
+| `quickswitch[?query=<text>][&choose=1][&close=1]` | Opens the quick switcher with a query; `choose=1` opens the first result and `close=1` hides it. |
+| `search?q=<terms>` | Runs a message search. The detail is the number of results. |
+| `jump[?index=<n>]` | Jumps to a search result. |
+| `join?channel=<name>` | Joins a public channel by name or display name. |
+| `leave` | Leaves the current channel. |
+| `favorite[?on=0]` | Adds the current channel to favorites, or removes it with `on=0`. |
+| `collapse?category=<title>[&collapsed=0]` | Collapses a sidebar category by title, or expands it with `collapsed=0`. `on` is accepted as an alias. |
+| `link?url=<percent-encoded url>` | Handles a link as if it was clicked in a message, including permalinks and channel links. |
+| `notification-click?channel=<id>[&server=<index>][&team=<id>][&root=<id>]` | Routes a notification response the same way as clicking a delivered notification. |
+| `command?name=<name>[&number=<n>]` | Runs a menu or keyboard command, listed below. |
+
+`command` names: `focus-search`, `focus-composer`, `quick-switcher`, `toggle-sidebar`, `toggle-pane`, `zoom-in`,
+`zoom-out`, `zoom-reset`, `next-server`, `previous-server`, `server` (with `number`, 1-based), `next-channel`,
+`previous-channel`, `next-unread`, `browse`, `direct-messages`, `close-sheets` and `preview-last-image`.
+
+### UI state
+
+`state` also writes a `ui` object for the selected workspace. It includes the window title, first responder, open right
+pane and thread posts, quick switcher and search results, the highlighted post, the scroll report (distances from
+the top and bottom, content height, unseen count for the new-messages pill, older-page requests), timeline size and paging flags, the last posts with reactions and files, both composers (text, editing post,
+suggestions, uploads, height), typing users, unread and mention channels, favorites, collapsed categories, open sheets,
+the last session error, the workspace and cached post counts, and `editors`, the spell-checking and font size of every
+live composer text view.
 
 Output paths must be absolute and inside `/tmp` or `/private/tmp`; paths containing `..` and existing symbolic links
 are rejected.

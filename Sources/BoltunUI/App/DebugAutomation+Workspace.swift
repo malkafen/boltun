@@ -47,6 +47,12 @@ struct AutomationUIState: Codable, Equatable, Sendable {
     var error: String?
     var workspaces: Int
     var cachedSessionPosts: Int
+    var editors: [Editor] = []
+
+    struct Editor: Codable, Equatable, Sendable {
+        var spellChecking: Bool
+        var fontSize: Double
+    }
 }
 
 extension DebugAutomation {
@@ -275,8 +281,17 @@ extension DebugAutomation {
             sheets: sheets,
             error: workspace.visibleError,
             workspaces: router.workspaces.count,
-            cachedSessionPosts: session.posts.count
+            cachedSessionPosts: session.posts.count,
+            editors: Self.editors(in: host?.mainWindow?.contentView)
         )
+    }
+
+    static func editors(in view: NSView?) -> [AutomationUIState.Editor] {
+        guard let view else { return [] }
+        if let editor = view as? ComposerNSTextView {
+            return [AutomationUIState.Editor(spellChecking: editor.isContinuousSpellCheckingEnabled, fontSize: Double(editor.font?.pointSize ?? 0))]
+        }
+        return view.subviews.flatMap { editors(in: $0) }
     }
 
     static func summary(_ post: Post, session: ServerSession) -> AutomationUIState.PostSummary {

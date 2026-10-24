@@ -184,6 +184,12 @@ public final class DebugAutomation {
             let server = try server(at: index)
             await model.removeServer(server.id)
             return server.id.uuidString
+        case .setting(let name, let value):
+            switch name {
+            case "spellChecking": model.settings.spellChecking = DebugCommand.flag(value)
+            default: throw AutomationError.failed("unknown setting \(name)")
+            }
+            return value
         case .select(let index, let team, let channel):
             let server = try server(at: index)
             await model.select(serverId: server.id)
