@@ -47,7 +47,7 @@ extension ServerSession {
             }
             return post
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            report(error)
             return nil
         }
     }
@@ -73,7 +73,7 @@ extension ServerSession {
             try await loadTeam(teamId)
             return true
         } catch {
-            lastError = APIError.wrap(error).localizedDescription
+            report(error)
             return false
         }
     }
