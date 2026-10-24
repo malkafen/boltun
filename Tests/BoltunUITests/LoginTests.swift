@@ -54,6 +54,9 @@ struct LoginAddServerTests {
         transport.set("GET system/ping", status: 500, #"{"id":"x","message":"Down for maintenance"}"#)
         #expect(!(await viewModel.validate()))
         #expect(viewModel.errorMessage == "Down for maintenance")
+        transport.set("GET system/ping", status: 500, "Internal Server Error")
+        #expect(!(await viewModel.validate()))
+        #expect(viewModel.errorMessage == "No Mattermost server was found at this address.")
         #expect(!viewModel.isValidating)
     }
 

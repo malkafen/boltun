@@ -12,6 +12,7 @@ public enum DebugCommand: Equatable, Sendable {
     case addServer(url: String, name: String?)
     case login(server: Int, user: String, password: String)
     case logout(server: Int)
+    case removeServer(server: Int)
     case select(server: Int, team: String?, channel: String?)
     case open(url: URL)
     case state(path: String)
@@ -75,6 +76,9 @@ public enum DebugCommand: Equatable, Sendable {
             return .login(server: index(query["server"]) ?? 0, user: user, password: password)
         case "logout":
             return .logout(server: index(query["server"]) ?? 0)
+        case "remove-server":
+            guard let server = index(query["server"]) else { return nil }
+            return .removeServer(server: server)
         case "select":
             return .select(server: index(query["server"]) ?? 0, team: nonEmpty(query["team"]), channel: nonEmpty(query["channel"]))
         case "open":

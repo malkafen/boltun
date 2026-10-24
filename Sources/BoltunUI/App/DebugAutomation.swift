@@ -162,7 +162,13 @@ public final class DebugAutomation {
             try Snapshot.write(data, to: path)
             return path
         case .addServer(let url, let name):
-            let (resolved, config) = try await model.validate(url: url)
+            let resolved: URL
+            let config: ClientConfig
+            do {
+                (resolved, config) = try await model.validate(url: url)
+            } catch {
+                throw AutomationError.failed(AddServerViewModel.describe(error))
+            }
             let server = model.addServer(name: name ?? config.siteName, url: resolved)
             await model.select(serverId: server.id)
             return server.id.uuidString
@@ -174,6 +180,10 @@ public final class DebugAutomation {
         case .logout(let index):
             await model.logout(serverId: try server(at: index).id)
             return ""
+        case .removeServer(let index):
+            let server = try server(at: index)
+            await model.removeServer(server.id)
+            return server.id.uuidString
         case .select(let index, let team, let channel):
             let server = try server(at: index)
             await model.select(serverId: server.id)
