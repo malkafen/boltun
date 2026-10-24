@@ -468,6 +468,7 @@ struct ReactionChip: View {
             .overlay(Capsule().strokeBorder(reaction.isMine ? Theme.reactionMineBorder : Color.clear))
         }
         .buttonStyle(.plain)
+        .pointerStyle(.link)
         .help(ReactionTooltip.text(names: reaction.userNames, emojiName: reaction.emojiName))
     }
 }
