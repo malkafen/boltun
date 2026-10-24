@@ -12,6 +12,10 @@ struct ScrollFollowState: Equatable {
         if atBottom { settled = true }
     }
 
+    mutating func scrolled(atBottom: Bool, contentGrewInPlace: Bool) {
+        scrolled(atBottom: atBottom || (contentGrewInPlace && isAtBottom))
+    }
+
     mutating func postsChanged(postIds: [String], lastIsMine: Bool) -> Bool {
         let newLast = postIds.last
         let previous = lastPostId
@@ -37,6 +41,10 @@ struct ScrollMetrics: Equatable {
     static let loadOlderThreshold: CGFloat = 600
 
     var isAtBottom: Bool { distanceFromBottom <= Self.bottomThreshold }
+
+    func grewInPlace(from old: ScrollMetrics) -> Bool {
+        contentHeight > old.contentHeight && abs(distanceFromTop - old.distanceFromTop) < 0.5
+    }
     var shouldLoadOlder: Bool { distanceFromTop < Self.loadOlderThreshold }
     var zone: ScrollZone { ScrollZone(atBottom: isAtBottom, nearTop: shouldLoadOlder) }
 
@@ -272,7 +280,7 @@ struct MessageListView: View {
             report(metrics, loadOlder: false)
             return
         }
-        follow.scrolled(atBottom: metrics.isAtBottom)
+        follow.scrolled(atBottom: metrics.isAtBottom, contentGrewInPlace: metrics.grewInPlace(from: old))
         let loadOlder = follow.settled && ScrollZone.shouldLoadOlder(zone: metrics.zone, timeline: current)
         report(metrics, loadOlder: loadOlder)
         toast?.scrolled(atBottom: metrics.isAtBottom, offsetFromBottom: metrics.distanceFromBottom)
@@ -428,6 +436,12 @@ struct MessageListView: View {
                 withAnimation(animated && pass == 0 ? .easeOut(duration: 0.15) : nil) {
                     position.scrollTo(id: lastItemId, anchor: pass.isMultiple(of: 2) ? .bottom : .bottomLeading)
                 }
+            }
+            for _ in 0..<Self.alignPassLimit {
+                try? await Task.sleep(for: Self.settleDelay)
+                guard bottomTargetId == lastItemId else { return }
+                if tracker.metrics.distanceFromBottom <= 1 { break }
+                position.scrollTo(edge: .bottom)
             }
             try? await Task.sleep(for: Self.settleDelay)
             if bottomTargetId == lastItemId { bottomTargetId = nil }

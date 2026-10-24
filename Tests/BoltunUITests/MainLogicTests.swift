@@ -377,6 +377,32 @@ import Testing
 }
 
 @Suite @MainActor struct MainViewModelTests {
+    @Test func tallNewPostAtTheBottomKeepsFollowing() {
+        var state = ScrollFollowState()
+        _ = state.postsChanged(postIds: ["a"], lastIsMine: false)
+        state.scrolled(atBottom: true)
+        let before = ScrollMetrics(distanceFromTop: 700, distanceFromBottom: 0, contentHeight: 1000, containerHeight: 300)
+        let grown = ScrollMetrics(distanceFromTop: 700, distanceFromBottom: 140, contentHeight: 1140, containerHeight: 300)
+        #expect(grown.grewInPlace(from: before))
+        state.scrolled(atBottom: grown.isAtBottom, contentGrewInPlace: grown.grewInPlace(from: before))
+        #expect(state.isAtBottom)
+        let follows = state.postsChanged(postIds: ["a", "b"], lastIsMine: false)
+        #expect(follows)
+    }
+
+    @Test func scrollingUpStillStopsFollowing() {
+        var state = ScrollFollowState()
+        state.scrolled(atBottom: true)
+        let before = ScrollMetrics(distanceFromTop: 700, distanceFromBottom: 0, contentHeight: 1000, containerHeight: 300)
+        let scrolled = ScrollMetrics(distanceFromTop: 500, distanceFromBottom: 200, contentHeight: 1000, containerHeight: 300)
+        #expect(!scrolled.grewInPlace(from: before))
+        state.scrolled(atBottom: scrolled.isAtBottom, contentGrewInPlace: scrolled.grewInPlace(from: before))
+        #expect(!state.isAtBottom)
+        let grownWhileUp = ScrollMetrics(distanceFromTop: 500, distanceFromBottom: 340, contentHeight: 1140, containerHeight: 300)
+        state.scrolled(atBottom: grownWhileUp.isAtBottom, contentGrewInPlace: grownWhileUp.grewInPlace(from: scrolled))
+        #expect(!state.isAtBottom)
+    }
+
     @Test func scrollFollow() {
         var state = ScrollFollowState()
         var ids = ["a"]
