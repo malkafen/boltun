@@ -158,6 +158,7 @@ public struct Post: Codable, Hashable, Identifiable, Sendable {
     public var replyCount: Int
     public var lastReplyAt: Int64
     public var participantIds: [String]
+    public var isFollowing: Bool?
     public var metadata: PostMetadata
 
     public init(
@@ -179,6 +180,7 @@ public struct Post: Codable, Hashable, Identifiable, Sendable {
         replyCount: Int = 0,
         lastReplyAt: Int64 = 0,
         participantIds: [String] = [],
+        isFollowing: Bool? = nil,
         metadata: PostMetadata = PostMetadata()
     ) {
         self.id = id
@@ -199,6 +201,7 @@ public struct Post: Codable, Hashable, Identifiable, Sendable {
         self.replyCount = replyCount
         self.lastReplyAt = lastReplyAt
         self.participantIds = participantIds
+        self.isFollowing = isFollowing
         self.metadata = metadata
     }
 
@@ -217,6 +220,7 @@ public struct Post: Codable, Hashable, Identifiable, Sendable {
         case replyCount = "reply_count"
         case lastReplyAt = "last_reply_at"
         case participantIds = "participants"
+        case isFollowing = "is_following"
     }
 
     public init(from decoder: Decoder) throws {
@@ -239,6 +243,7 @@ public struct Post: Codable, Hashable, Identifiable, Sendable {
         replyCount = c.int(.replyCount)
         lastReplyAt = c.int64(.lastReplyAt)
         participantIds = Self.decodeParticipants(c)
+        isFollowing = try? c.decodeIfPresent(Bool.self, forKey: .isFollowing)
         metadata = c.value(.metadata, default: PostMetadata())
     }
 
@@ -252,6 +257,7 @@ public struct Post: Codable, Hashable, Identifiable, Sendable {
     public func mergingThreadSummary(from old: Post) -> Post {
         var merged = self
         if merged.participantIds.isEmpty { merged.participantIds = old.participantIds }
+        if merged.isFollowing == nil { merged.isFollowing = old.isFollowing }
         if merged.replyCount == 0 && merged.lastReplyAt == 0 {
             merged.replyCount = old.replyCount
             merged.lastReplyAt = old.lastReplyAt

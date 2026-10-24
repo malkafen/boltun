@@ -131,6 +131,15 @@ final class Workspace {
         if (threadSeenAt[rootId] ?? 0) < seen { threadSeenAt[rootId] = seen }
     }
 
+    var threadFollowing: Bool? {
+        guard session.collapsedThreads, let rootId = threadRootId, let root = session.posts[rootId], !root.isReply else { return nil }
+        return session.isFollowing(threadId: rootId)
+    }
+
+    func setFollowing(threadId: String, _ following: Bool) async {
+        await session.setFollowing(threadId: threadId, following)
+    }
+
     func search() async {
         let terms = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !terms.isEmpty else { return }
@@ -336,7 +345,7 @@ final class Workspace {
 
     var mentionKeys: [String] { markupContext().mentionKeys }
 
-    func timelineContext(lastViewedAt: Int64, showReplyContext: Bool, collapsedThreads: Bool = false) -> TimelineContext {
+    func timelineContext(lastViewedAt: Int64, showReplyContext: Bool, collapsedThreads: Bool = false, followThreads: Bool = false) -> TimelineContext {
         let session = session
         let markup = markupContext()
         let cache = renderCache
@@ -353,6 +362,7 @@ final class Workspace {
             calendar: calendar,
             showReplyContext: showReplyContext,
             collapsedThreads: collapsedThreads,
+            followThreads: followThreads,
             openThreadId: threadRootId,
             displayName: { session.displayName(for: $0) },
             userName: { session.displayName(userId: $0) },
@@ -363,6 +373,8 @@ final class Workspace {
             },
             userAvatarURL: avatarURL,
             threadSeenAt: { seen[$0] ?? 0 },
+            status: { session.statuses[$0] },
+            isFollowing: { session.isFollowing(threadId: $0) },
             customEmojiId: { session.customEmojis[$0]?.id },
             render: { cache.blocks(for: $0, context: markup) }
         )
@@ -372,12 +384,20 @@ final class Workspace {
         let timeline = session.timelines[channelId] ?? ChannelTimeline()
         return TimelineBuilder.items(
             posts: session.timelinePosts(channelId: channelId),
-            context: timelineContext(lastViewedAt: timeline.lastViewedAtOnOpen, showReplyContext: !session.collapsedThreads, collapsedThreads: session.collapsedThreads)
+            context: timelineContext(
+                lastViewedAt: timeline.lastViewedAtOnOpen,
+                showReplyContext: !session.collapsedThreads,
+                collapsedThreads: session.collapsedThreads,
+                followThreads: session.collapsedThreads
+            )
         )
     }
 
     func threadItems(rootId: String) -> [TimelineItem] {
-        TimelineBuilder.threadItems(posts: session.threadPosts(rootId: rootId), context: timelineContext(lastViewedAt: 0, showReplyContext: false))
+        TimelineBuilder.threadItems(
+            posts: session.threadPosts(rootId: rootId),
+            context: timelineContext(lastViewedAt: 0, showReplyContext: false, followThreads: session.collapsedThreads)
+        )
     }
 
     func emojiChoices(query: String, limit: Int = 120) -> [(name: String, glyph: String)] {

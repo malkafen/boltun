@@ -8,6 +8,7 @@ struct Avatar: View {
     let name: String
     var size: CGFloat = 36
     var status: UserStatusValue?
+    var statusRing: Color = Theme.sidebar
 
     static let pixelSize: CGFloat = 96
 
@@ -19,7 +20,8 @@ struct Avatar: View {
         .clipShape(Circle())
         .overlay(alignment: .bottomTrailing) {
             if let status {
-                StatusDot(status: status, size: max(8, size * 0.36))
+                StatusDot(status: status, size: max(8, size * 0.36), ring: statusRing)
+                    .help(status.title)
                     .offset(x: size > 24 ? 1 : 2, y: size > 24 ? 1 : 2)
             }
         }
@@ -45,20 +47,34 @@ struct InitialsBadge: View {
 struct StatusDot: View {
     let status: UserStatusValue
     var size: CGFloat = 9
+    var ring: Color = Theme.sidebar
 
     var body: some View {
         ZStack {
-            Circle().fill(Theme.sidebar)
+            Circle().fill(ring)
             switch status {
             case .online: Circle().fill(Theme.online).padding(1.5)
             case .away: Circle().fill(Theme.away).padding(1.5)
             case .dnd:
                 Circle().fill(Theme.dnd).padding(1.5)
-                Capsule().fill(Theme.sidebar).frame(width: size * 0.45, height: max(1.5, size * 0.14))
+                Capsule().fill(ring).frame(width: size * 0.45, height: max(1.5, size * 0.14))
             case .offline: Circle().strokeBorder(Theme.offline, lineWidth: 1.5).padding(1.5)
             }
         }
         .frame(width: size, height: size)
+    }
+}
+
+extension UserStatusValue {
+    static let selectable: [UserStatusValue] = [.online, .away, .dnd, .offline]
+
+    var title: String {
+        switch self {
+        case .online: return "Online"
+        case .away: return "Away"
+        case .dnd: return "Do Not Disturb"
+        case .offline: return "Offline"
+        }
     }
 }
 

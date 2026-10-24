@@ -12,6 +12,8 @@ struct AutomationUIState: Codable, Equatable, Sendable {
         var files: Int
         var edited: Bool
         var replyCount: Int = 0
+        var following: Bool?
+        var status: String?
     }
 
     struct Composer: Codable, Equatable, Sendable {
@@ -50,6 +52,8 @@ struct AutomationUIState: Codable, Equatable, Sendable {
     var cachedSessionPosts: Int
     var editors: [Editor] = []
     var collapsedThreads = false
+    var myStatus: String?
+    var threadFollowing: Bool?
 
     struct Editor: Codable, Equatable, Sendable {
         var spellChecking: Bool
@@ -180,6 +184,13 @@ extension DebugAutomation {
         case .link(let url):
             await workspace.handle(link: url)
             return ""
+        case .follow(let on, let postId):
+            guard let rootId = postId ?? workspace.threadRootId else { throw AutomationError.failed("no thread") }
+            await workspace.setFollowing(threadId: rootId, on)
+            return "\(session.isFollowing(threadId: rootId))"
+        case .setStatus(let status):
+            await session.setStatus(status)
+            return session.statuses[session.myId]?.rawValue ?? ""
         case .teamFavorite(let name, let on):
             let team = try team(named: name, in: session)
             session.setFavorite(teamId: team.id, favorite: on)
@@ -302,7 +313,9 @@ extension DebugAutomation {
             workspaces: router.workspaces.count,
             cachedSessionPosts: session.posts.count,
             editors: Self.editors(in: host?.mainWindow?.contentView),
-            collapsedThreads: session.collapsedThreads
+            collapsedThreads: session.collapsedThreads,
+            myStatus: session.statuses[session.myId]?.rawValue,
+            threadFollowing: workspace.threadFollowing
         )
     }
 
@@ -323,7 +336,9 @@ extension DebugAutomation {
             reactions: post.reactionSummary.map { "\($0.emojiName):\($0.count)" },
             files: post.metadata.files.count,
             edited: post.isEdited,
-            replyCount: post.replyCount
+            replyCount: post.replyCount,
+            following: post.isReply ? nil : session.isFollowing(threadId: post.id),
+            status: session.statuses[post.userId]?.rawValue
         )
     }
 

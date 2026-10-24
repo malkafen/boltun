@@ -40,6 +40,7 @@ struct MessageRowModel: Equatable, Identifiable {
     var post: Post
     var authorName: String
     var avatarURL: URL?
+    var authorStatus: UserStatusValue?
     var isContinuation: Bool
     var isMine: Bool
     var mentionsMe: Bool
@@ -47,16 +48,17 @@ struct MessageRowModel: Equatable, Identifiable {
     var replyContext: ReplyContext?
     var replyCount: Int
     var thread: ThreadSummary?
+    var following: Bool?
     var reactions: [ReactionChipModel]
     var timeText: String
     var fullTimeText: String
     var blocks: [MessageBlock]
 
     static func == (lhs: MessageRowModel, rhs: MessageRowModel) -> Bool {
-        lhs.post == rhs.post && lhs.authorName == rhs.authorName && lhs.avatarURL == rhs.avatarURL
+        lhs.post == rhs.post && lhs.authorName == rhs.authorName && lhs.avatarURL == rhs.avatarURL && lhs.authorStatus == rhs.authorStatus
             && lhs.isContinuation == rhs.isContinuation && lhs.isMine == rhs.isMine && lhs.mentionsMe == rhs.mentionsMe
             && lhs.replyContext == rhs.replyContext && lhs.replyCount == rhs.replyCount && lhs.thread == rhs.thread && lhs.reactions == rhs.reactions
-            && lhs.timeText == rhs.timeText
+            && lhs.following == rhs.following && lhs.timeText == rhs.timeText
     }
 }
 
@@ -85,6 +87,7 @@ struct TimelineContext {
     var calendar: Calendar = .current
     var showReplyContext = true
     var collapsedThreads = false
+    var followThreads = false
     var openThreadId: String?
     var displayName: (Post) -> String = { $0.userId }
     var userName: (String) -> String = { $0 }
@@ -92,6 +95,8 @@ struct TimelineContext {
     var avatarURL: (Post) -> URL? = { _ in nil }
     var userAvatarURL: (String) -> URL? = { _ in nil }
     var threadSeenAt: (String) -> Int64 = { _ in 0 }
+    var status: (String) -> UserStatusValue? = { _ in nil }
+    var isFollowing: (String) -> Bool = { _ in false }
     var customEmojiId: (String) -> String? = { _ in nil }
     var render: (Post) -> [MessageBlock] = { MessageRenderer.render($0.message) }
 }
@@ -153,6 +158,7 @@ enum TimelineBuilder {
             post: post,
             authorName: context.displayName(post),
             avatarURL: context.avatarURL(post),
+            authorStatus: authorStatus(for: post, context: context),
             isContinuation: continuation,
             isMine: isMine,
             mentionsMe: !isMine && !post.isSystemMessage && MentionDetector.mentions(post.message, username: context.myUsername, keys: context.mentionKeys),
@@ -160,11 +166,22 @@ enum TimelineBuilder {
             replyContext: context.showReplyContext ? replyContext(for: post, previous: previous, context: context) : nil,
             replyCount: post.isReply ? 0 : post.replyCount,
             thread: context.collapsedThreads ? threadSummary(for: post, context: context) : nil,
+            following: following(for: post, context: context),
             reactions: reactions(for: post, context: context),
             timeText: TimeFormatting.time(date, calendar: context.calendar),
             fullTimeText: TimeFormatting.full(date, calendar: context.calendar),
             blocks: post.isDeleted ? [] : context.render(post)
         )
+    }
+
+    static func authorStatus(for post: Post, context: TimelineContext) -> UserStatusValue? {
+        guard !post.isSystemMessage, post.overrideUsername == nil, !post.userId.isEmpty else { return nil }
+        return context.status(post.userId)
+    }
+
+    static func following(for post: Post, context: TimelineContext) -> Bool? {
+        guard context.followThreads, !post.isReply, !post.isSystemMessage, !post.isDeleted, post.pendingPostId != post.id else { return nil }
+        return context.isFollowing(post.id)
     }
 
     static func threadSummary(for post: Post, context: TimelineContext) -> ThreadSummary? {

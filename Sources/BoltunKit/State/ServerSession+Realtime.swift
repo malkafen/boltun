@@ -24,7 +24,10 @@ extension ServerSession {
         case .connected(let needsResync):
             guard connection != .unauthorized else { return }
             connection = .connected
-            if needsResync { await resync() }
+            if needsResync {
+                await resync()
+                await refreshPresence()
+            }
         case .disconnected:
             guard connection != .unauthorized else { return }
             connection = .reconnecting
@@ -140,6 +143,8 @@ extension ServerSession {
             }
         case WebSocketEventType.emojiAdded:
             if let emoji = event.embedded(CustomEmoji.self, "emoji") { customEmojis[emoji.name] = emoji }
+        case WebSocketEventType.threadFollowChanged:
+            applyFollowChange(event)
         default:
             break
         }
@@ -203,6 +208,8 @@ extension ServerSession {
             teamUnreads[teamId] = unread
         }
         receive(post: post)
+        applyFollowers(event, post: post, mentioned: mentioned)
+        if event.data["set_online"]?.boolValue == true { markActive(userId: post.userId) }
         if channel == nil, teamId.isEmpty || loadedTeams.contains(teamId) {
             Task { await self.refreshChannel(post.channelId) }
         }
