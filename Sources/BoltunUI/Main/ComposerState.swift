@@ -322,6 +322,14 @@ final class ComposerState {
         }
     }
 
+    func insert(_ string: String) {
+        let ns = text as NSString
+        let location = min(cursor, ns.length)
+        let updated = ns.replacingCharacters(in: NSRange(location: location, length: 0), with: string)
+        replaceText(updated, cursor: location + (string as NSString).length)
+        requestFocus()
+    }
+
     func removeUpload(_ id: UUID) {
         uploads.removeAll { $0.id == id }
     }

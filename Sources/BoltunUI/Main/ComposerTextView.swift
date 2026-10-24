@@ -56,12 +56,14 @@ enum PasteboardReader {
 final class ComposerNSTextView: NSTextView {
     var onFiles: (([URL]) -> Void)?
     var onImage: ((Data) -> Void)?
+    var pasteboard: NSPasteboard = .general
 
     override func paste(_ sender: Any?) {
-        switch PasteboardReader.content(of: .general) {
+        switch PasteboardReader.content(of: pasteboard) {
         case .files(let urls): onFiles?(urls)
         case .image(let data): onImage?(data)
-        case .text: pasteAsPlainText(sender)
+        case .text:
+            if let string = pasteboard.string(forType: .string) { insertText(string, replacementRange: selectedRange()) }
         }
     }
 
@@ -168,7 +170,7 @@ struct ComposerTextView: NSViewRepresentable {
 
         func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
             guard let key = ComposerKeyMapper.key(for: selector) else { return false }
-            let modifiers = ComposerKeyMapper.modifiers(for: selector, flags: NSApp.currentEvent?.modifierFlags ?? [])
+            let modifiers = ComposerKeyMapper.modifiers(for: selector, flags: NSApplication.shared.currentEvent?.modifierFlags ?? [])
             let command = ComposerKeyRouter.command(for: key, modifiers: modifiers, context: state.keyContext)
             if command == .insertNewline {
                 textView.insertNewlineIgnoringFieldEditor(nil)

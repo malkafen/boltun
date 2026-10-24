@@ -82,8 +82,13 @@ struct ComposerView: View {
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(state.editingPostId == nil ? Theme.border : Theme.warning.opacity(0.6)))
             .overlay(alignment: .top) {
                 if state.hasSuggestions {
-                    AutocompletePopup(state: state, client: workspace.session.client)
-                        .alignmentGuide(.top) { $0[.bottom] + 6 }
+                    Color.clear
+                        .frame(height: 0)
+                        .overlay(alignment: .bottom) {
+                            AutocompletePopup(state: state, client: workspace.session.client)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.bottom, 6)
+                        }
                 }
             }
         }
@@ -100,16 +105,6 @@ struct ComposerView: View {
             let urls = panel.urls
             Task { @MainActor in state.attach(fileURLs: urls) }
         }
-    }
-}
-
-extension ComposerState {
-    func insert(_ string: String) {
-        let ns = text as NSString
-        let location = min(cursor, ns.length)
-        let updated = ns.replacingCharacters(in: NSRange(location: location, length: 0), with: string)
-        replaceText(updated, cursor: location + (string as NSString).length)
-        requestFocus()
     }
 }
 

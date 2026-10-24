@@ -344,7 +344,7 @@ final class Workspace {
     }
 
     func threadItems(rootId: String) -> [TimelineItem] {
-        TimelineBuilder.items(posts: session.threadPosts(rootId: rootId), context: timelineContext(lastViewedAt: 0, showReplyContext: false))
+        TimelineBuilder.threadItems(posts: session.threadPosts(rootId: rootId), context: timelineContext(lastViewedAt: 0, showReplyContext: false))
     }
 
     func emojiChoices(query: String, limit: Int = 120) -> [(name: String, glyph: String)] {

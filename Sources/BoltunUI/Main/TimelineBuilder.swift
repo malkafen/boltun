@@ -45,12 +45,14 @@ struct MessageRowModel: Equatable, Identifiable {
 enum TimelineItem: Identifiable, Equatable {
     case date(String)
     case newMessages
+    case replies(Int)
     case post(MessageRowModel)
 
     var id: String {
         switch self {
         case .date(let title): return "date:\(title)"
         case .newMessages: return "new-messages"
+        case .replies: return "replies"
         case .post(let model): return model.post.id
         }
     }
@@ -101,6 +103,16 @@ enum TimelineBuilder {
             result.append(.post(row(for: post, previous: previous, continuation: continuation, context: context)))
             previous = post
         }
+        return result
+    }
+
+    static func threadItems(posts: [Post], context: TimelineContext) -> [TimelineItem] {
+        guard let root = posts.first, !root.isReply else { return items(posts: posts, context: context) }
+        let replies = Array(posts.dropFirst())
+        var result: [TimelineItem] = [.post(row(for: root, previous: nil, continuation: false, context: context))]
+        guard !replies.isEmpty else { return result }
+        result.append(.replies(replies.count))
+        result.append(contentsOf: items(posts: replies, context: context).filter { if case .date = $0 { return false } else { return true } })
         return result
     }
 

@@ -64,10 +64,12 @@ struct ThreadPane: View {
                     }
                     .padding(.vertical, 8)
                 }
-                .defaultScrollAnchor(.bottom)
+                .defaultScrollAnchor(.top, for: .alignment)
+                .defaultScrollAnchor(.bottom, for: .initialOffset)
+                .defaultScrollAnchor(.bottom, for: .sizeChanges)
             }
             if let root {
-                TypingIndicator(names: session.typingUsers(channelId: root.channelId, parentId: rootId))
+                LiveTypingIndicator(session: session, channelId: root.channelId, parentId: rootId)
                 ComposerView(state: workspace.composer(for: ComposerTarget(channelId: root.channelId, rootId: rootId)), workspace: workspace, placeholder: "Reply…")
                     .id(rootId)
             }

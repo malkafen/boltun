@@ -14,6 +14,15 @@ struct TimelineItemView: View {
             DateSeparator(title: title)
         case .newMessages:
             NewMessagesLine()
+        case .replies(let count):
+            HStack(spacing: 10) {
+                Text(count == 1 ? "1 reply" : "\(count) replies")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(Theme.textSecondary)
+                Rectangle().fill(Theme.separator).frame(height: 1)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
         case .post(let model):
             MessageRow(model: model, workspace: workspace, inThread: inThread)
                 .equatable()
@@ -58,8 +67,15 @@ struct MessageRow: View, Equatable {
     let model: MessageRowModel
     let workspace: Workspace
     var inThread = false
-    @State private var hovering = false
+    @State private var hovering: Bool
     @State private var pickerShown = false
+
+    init(model: MessageRowModel, workspace: Workspace, inThread: Bool = false, hovering: Bool = false) {
+        self.model = model
+        self.workspace = workspace
+        self.inThread = inThread
+        _hovering = State(initialValue: hovering)
+    }
 
     nonisolated static func == (lhs: MessageRow, rhs: MessageRow) -> Bool {
         MainActor.assumeIsolated {

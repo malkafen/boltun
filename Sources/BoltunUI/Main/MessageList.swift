@@ -42,12 +42,23 @@ struct ScrollMetrics: Equatable {
 
     var isAtBottom: Bool { distanceFromBottom < Self.bottomThreshold }
     var shouldLoadOlder: Bool { distanceFromTop < Self.loadOlderThreshold }
+    var zone: ScrollZone { ScrollZone(atBottom: isAtBottom, nearTop: shouldLoadOlder) }
+}
+
+struct ScrollZone: Equatable {
+    var atBottom = true
+    var nearTop = false
+
+    static func shouldLoadOlder(zone: ScrollZone, timeline: ChannelTimeline) -> Bool {
+        zone.nearTop && timeline.loaded && timeline.hasMoreOlder && !timeline.isLoading
+    }
 }
 
 struct MessageListView: View {
     let workspace: Workspace
     let channelId: String
     @State private var follow = ScrollFollowState()
+    @State private var zone = ScrollZone()
     @State private var position = ScrollPosition(edge: .bottom)
 
     var body: some View {

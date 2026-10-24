@@ -144,6 +144,16 @@ import Testing
         #expect(rows(items).allSatisfy { $0.replyContext == nil })
     }
 
+    @Test func threadItemsInsertRepliesDivider() {
+        let posts = Fixture.townPosts().filter { ["p1", "p3", "r1"].contains($0.id) }
+        let context = self.context(showReply: false)
+        #expect(TimelineBuilder.threadItems(posts: posts, context: context).map(\.id) == ["p1", "replies", "p3", "r1"])
+        #expect(TimelineBuilder.threadItems(posts: [posts[0]], context: context).map(\.id) == ["p1"])
+        #expect(TimelineBuilder.threadItems(posts: [posts[1]], context: context).first == .date("Today"))
+        #expect(TimelineBuilder.threadItems(posts: [], context: context).isEmpty)
+        #expect(TimelineItem.replies(2).id == "replies")
+    }
+
     @Test func replyContextForMissingRoot() {
         let reply = Post(id: "x", createAt: 1, userId: "a", channelId: "c", rootId: "gone", message: "hi")
         let context = TimelineBuilder.replyContext(for: reply, previous: nil, context: self.context())

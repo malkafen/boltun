@@ -68,7 +68,7 @@ struct ChannelSidebar: View {
 
     var body: some View {
         let session = workspace.session
-        let sections = session.sidebar
+        let sections = session.sidebar.filter { $0.type != .favorites || !$0.channelIds.isEmpty }
         let rows = Dictionary(uniqueKeysWithValues: sections.flatMap(\.channelIds).compactMap { id in SidebarRowModel.make(channelId: id, session: session).map { (id, $0) } })
         VStack(spacing: 0) {
             SidebarHeader(workspace: workspace)

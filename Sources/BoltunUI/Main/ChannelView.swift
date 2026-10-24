@@ -15,7 +15,7 @@ struct ChannelView: View {
                 ConnectionBanners(workspace: workspace)
                 MessageListView(workspace: workspace, channelId: channel.id)
                     .id(channel.id)
-                TypingIndicator(names: session.typingUsers(channelId: channel.id))
+                LiveTypingIndicator(session: session, channelId: channel.id)
                 if channel.isArchived {
                     Text("You are viewing an archived channel. New messages cannot be posted.")
                         .font(.system(size: 12.5))
@@ -217,6 +217,22 @@ struct ConnectionBanners: View {
             }
             if let error = workspace.visibleError {
                 Banner(style: .error, text: error, onDismiss: { workspace.dismissError() })
+            }
+        }
+    }
+}
+
+struct LiveTypingIndicator: View {
+    let session: ServerSession
+    let channelId: String
+    var parentId = ""
+
+    var body: some View {
+        if session.typing[parentId.isEmpty ? channelId : "\(channelId):\(parentId)"]?.isEmpty ?? true {
+            TypingIndicator(names: [])
+        } else {
+            TimelineView(.periodic(from: .now, by: 1)) { _ in
+                TypingIndicator(names: session.typingUsers(channelId: channelId, parentId: parentId))
             }
         }
     }
