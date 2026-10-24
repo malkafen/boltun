@@ -63,7 +63,7 @@ struct ComposerView: View {
                             .help("Maximum \(state.maxLength) characters")
                             .padding(.trailing, 6)
                     }
-                    Button { Task { await state.send() } } label: {
+                    Button { state.submit() } label: {
                         Image(systemName: state.editingPostId == nil ? "paperplane.fill" : "checkmark")
                             .scaledFont(12, weight: .semibold)
                             .foregroundStyle(state.canSend ? .white : Theme.textSecondary)

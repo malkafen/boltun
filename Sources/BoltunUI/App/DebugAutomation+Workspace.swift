@@ -80,8 +80,8 @@ extension DebugAutomation {
         case .send(let text, let thread):
             let state = try composer(workspace, thread: thread)
             state.replaceText(text)
-            guard state.canSend else { throw AutomationError.failed("cannot send") }
-            await state.send()
+            guard let task = state.submit() else { throw AutomationError.failed("cannot send") }
+            await task.value
             return session.lastError.map { "error: \($0)" } ?? ""
         case .type(let text, let thread):
             let state = try composer(workspace, thread: thread)
