@@ -98,13 +98,13 @@ func findSubview<T: NSView>(_ type: T.Type, in view: NSView) -> T? {
         window.isReleasedWhenClosed = false
         window.contentView = hosting
         hosting.layoutSubtreeIfNeeded()
-        Snapshot.pump(0.1)
+        MainSnapshot.pump(0.1)
         let textView = findSubview(ComposerNSTextView.self, in: hosting)
         #expect(textView != nil)
         state.replaceText("programmatic", cursor: 4)
         state.requestFocus()
         for _ in 0..<10 {
-            Snapshot.pump(0.02)
+            MainSnapshot.pump(0.02)
             try? await Task.sleep(for: .milliseconds(5))
             hosting.layoutSubtreeIfNeeded()
         }

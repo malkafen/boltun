@@ -39,18 +39,18 @@ struct MainLiveTests {
         #expect(await eventually(timeout: .seconds(10)) { session.timelines[channelId]?.loaded == true })
         _ = await eventually(timeout: .seconds(3)) { session.timelinePosts(channelId: channelId).allSatisfy { session.users[$0.userId] != nil } }
         let view = MainView(model: model)
-        let rep = await Snapshot.render(view, size: CGSize(width: 1280, height: 800), name: "main-live", settle: .seconds(3))
-        #expect(Snapshot.distinctColors(rep) > 12)
+        let rep = await MainSnapshot.render(view, size: CGSize(width: 1280, height: 800), name: "main-live", settle: .seconds(3))
+        #expect(MainSnapshot.distinctColors(rep) > 12)
 
         if let root = session.timelinePosts(channelId: channelId).last(where: { !$0.isSystemMessage && !$0.isDeleted }) {
             let workspace = Workspace(session: session, serverURL: primary.url)
             await workspace.openThread(rootId: root.threadId)
             workspace.searchQuery = "deploy"
-            await Snapshot.render(WorkspaceView(workspace: workspace), size: CGSize(width: 1280, height: 800), name: "main-live-thread", settle: .seconds(2))
+            await MainSnapshot.render(WorkspaceView(workspace: workspace), size: CGSize(width: 1280, height: 800), name: "main-live-thread", settle: .seconds(2))
             await workspace.search()
-            await Snapshot.render(WorkspaceView(workspace: workspace), size: CGSize(width: 1280, height: 800), name: "main-live-search", settle: .seconds(2))
+            await MainSnapshot.render(WorkspaceView(workspace: workspace), size: CGSize(width: 1280, height: 800), name: "main-live-search", settle: .seconds(2))
             workspace.showQuickSwitcher = true
-            await Snapshot.render(WorkspaceView(workspace: workspace), size: CGSize(width: 1280, height: 800), name: "main-live-switcher", settle: .seconds(1))
+            await MainSnapshot.render(WorkspaceView(workspace: workspace), size: CGSize(width: 1280, height: 800), name: "main-live-switcher", settle: .seconds(1))
         }
     }
 }

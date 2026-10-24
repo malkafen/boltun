@@ -62,15 +62,18 @@ final class WorkspaceRegistry {
 
 struct WorkspaceView: View {
     @Bindable var workspace: Workspace
+    @Environment(\.appRouter) private var router
     @State private var sidebarWidth: CGFloat = 250
     @State private var paneWidth: CGFloat = 400
 
     var body: some View {
         let session = workspace.session
         HStack(spacing: 0) {
-            ChannelSidebar(workspace: workspace)
-                .frame(width: sidebarWidth)
-            ResizeHandle(width: $sidebarWidth, range: 200...380, direction: 1)
+            if router?.isSidebarVisible ?? true {
+                ChannelSidebar(workspace: workspace)
+                    .frame(width: sidebarWidth)
+                ResizeHandle(width: $sidebarWidth, range: 200...380, direction: 1)
+            }
             ChannelView(workspace: workspace)
                 .frame(minWidth: 380)
             if workspace.rightPane != nil {
@@ -102,6 +105,17 @@ struct WorkspaceView: View {
             if session.connection == .connected, session.currentTeamId == nil, let first = session.teams.first {
                 await session.selectTeam(first.id)
             }
+        }
+        .task { await consumePendingRoute() }
+        .onChange(of: router?.lastCommand) { _, event in
+            guard let event else { return }
+            Task { await workspace.perform(event.command, router: router) }
+        }
+    }
+
+    private func consumePendingRoute() async {
+        if let rootId = router?.consumePendingThreadRootId() {
+            await workspace.openThread(rootId: rootId)
         }
     }
 }

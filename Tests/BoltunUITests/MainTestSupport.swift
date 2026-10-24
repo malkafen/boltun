@@ -224,7 +224,7 @@ enum Fixture {
 }
 
 @MainActor
-enum Snapshot {
+enum MainSnapshot {
     static var directory: URL {
         URL(fileURLWithPath: ProcessInfo.processInfo.environment["BOLTUN_SNAPSHOT_DIR"] ?? "/tmp/boltun-shots")
     }
