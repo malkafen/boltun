@@ -64,10 +64,18 @@ public final class AppModel {
         await withTaskGroup(of: Void.self) { group in
             for server in servers {
                 let session = makeSession(for: server)
-                group.addTask { await session.start() }
+                let serverId = server.id
+                group.addTask {
+                    await session.start()
+                    await self.restoreSelectionIfSelected(serverId: serverId)
+                }
             }
         }
-        if let id = selectedServerId { await restoreSelection(serverId: id) }
+    }
+
+    func restoreSelectionIfSelected(serverId: UUID) async {
+        guard selectedServerId == serverId else { return }
+        await restoreSelection(serverId: serverId)
     }
 
     public func stopAll() {

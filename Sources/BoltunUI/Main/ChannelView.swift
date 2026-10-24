@@ -18,7 +18,7 @@ struct ChannelView: View {
                 LiveTypingIndicator(session: session, channelId: channel.id)
                 if channel.isArchived {
                     Text("You are viewing an archived channel. New messages cannot be posted.")
-                        .font(.system(size: 12.5))
+                        .scaledFont(12.5)
                         .foregroundStyle(Theme.textSecondary)
                         .frame(maxWidth: .infinity)
                         .padding(14)
@@ -47,7 +47,7 @@ struct ChannelView: View {
                 RoundedRectangle(cornerRadius: 10)
                     .strokeBorder(Theme.accent, style: StrokeStyle(lineWidth: 2, dash: [6]))
                     .background(Theme.accent.opacity(0.08))
-                    .overlay(Label("Drop files to upload", systemImage: "arrow.up.doc").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.textPrimary))
+                    .overlay(Label("Drop files to upload", systemImage: "arrow.up.doc").scaledFont(15, weight: .semibold).foregroundStyle(Theme.textPrimary))
                     .padding(8)
                     .allowsHitTesting(false)
             }
@@ -77,14 +77,14 @@ struct EmptyChannelView: View {
                 ProgressView().controlSize(.regular)
                 Text("Loading…").foregroundStyle(Theme.textSecondary)
             } else if session.teams.isEmpty && session.connection == .connected {
-                Image(systemName: "person.3").font(.system(size: 34)).foregroundStyle(Theme.textSecondary)
+                Image(systemName: "person.3").scaledFont(34).foregroundStyle(Theme.textSecondary)
                 Text("You are not a member of any team on this server.").foregroundStyle(Theme.textSecondary)
             } else {
-                Image(systemName: "bubble.left.and.bubble.right").font(.system(size: 34)).foregroundStyle(Theme.textSecondary)
+                Image(systemName: "bubble.left.and.bubble.right").scaledFont(34).foregroundStyle(Theme.textSecondary)
                 Text("Select a channel to start messaging").foregroundStyle(Theme.textSecondary)
             }
         }
-        .font(.system(size: 13))
+        .scaledFont(13)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
@@ -102,21 +102,21 @@ struct ChannelHeader: View {
                 HStack(spacing: 6) {
                     ChannelGlyph(channel: channel, session: session, size: 13)
                     Text(session.displayName(channel: channel))
-                        .font(.system(size: 15, weight: .bold))
+                        .scaledFont(15, weight: .bold)
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
                     Button {
                         Task { await session.setFavorite(channelId: channel.id, favorite: !favorite) }
                     } label: {
                         Image(systemName: favorite ? "star.fill" : "star")
-                            .font(.system(size: 12))
+                            .scaledFont(12)
                             .foregroundStyle(favorite ? Theme.away : Theme.textSecondary)
                     }
                     .buttonStyle(.plain)
                     .help(favorite ? "Remove from Favorites" : "Add to Favorites")
                     if let count = workspace.memberCounts[channel.id] {
                         Label("\(count)", systemImage: "person")
-                            .font(.system(size: 11.5, weight: .medium))
+                            .scaledFont(11.5, weight: .medium)
                             .foregroundStyle(Theme.textSecondary)
                             .help("\(count) members")
                     }
@@ -124,7 +124,7 @@ struct ChannelHeader: View {
                 let subtitle = ChannelHeader.subtitle(for: channel)
                 if !subtitle.isEmpty {
                     Text(subtitle)
-                        .font(.system(size: 12))
+                        .scaledFont(12)
                         .foregroundStyle(Theme.textSecondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -132,13 +132,13 @@ struct ChannelHeader: View {
                 }
             }
             Spacer(minLength: 12)
-            SearchField(text: Binding(get: { workspace.searchQuery }, set: { workspace.searchQuery = $0 })) {
+            SearchField(text: Binding(get: { workspace.searchQuery }, set: { workspace.searchQuery = $0 }), placeholder: "Search messages", focusRequest: workspace.searchFocusRequest) {
                 Task { await workspace.search() }
             }
             .frame(width: 230)
         }
         .padding(.horizontal, 18)
-        .frame(height: 56)
+        .frame(minHeight: 56)
         .overlay(alignment: .bottom) { Rectangle().fill(Theme.separator).frame(height: 1) }
         .task(id: channel.id) { await workspace.loadMemberCount(channelId: channel.id) }
     }
@@ -153,16 +153,19 @@ struct ChannelHeader: View {
 struct SearchField: View {
     @Binding var text: String
     var placeholder = "Search"
+    var focusRequest = 0
     let onSubmit: () -> Void
+    @FocusState private var focused: Bool
 
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 11.5, weight: .semibold))
+                .scaledFont(11.5, weight: .semibold)
                 .foregroundStyle(Theme.textSecondary)
             TextField(placeholder, text: $text)
                 .textFieldStyle(.plain)
-                .font(.system(size: 12.5))
+                .scaledFont(12.5)
+                .focused($focused)
                 .onSubmit(onSubmit)
             if !text.isEmpty {
                 Button { text = "" } label: {
@@ -172,9 +175,11 @@ struct SearchField: View {
             }
         }
         .padding(.horizontal, 9)
-        .frame(height: 28)
+        .frame(minHeight: 28)
         .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06)))
         .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.separator))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(focused ? Theme.accent.opacity(0.8) : .clear))
+        .onChange(of: focusRequest) { focused = true }
     }
 }
 
@@ -243,11 +248,11 @@ struct TypingIndicator: View {
 
     var body: some View {
         Text(TypingText.text(for: names) ?? " ")
-            .font(.system(size: 11.5))
+            .scaledFont(11.5)
             .foregroundStyle(Theme.textSecondary)
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20)
-            .frame(height: 18)
+            .frame(minHeight: 18)
     }
 }

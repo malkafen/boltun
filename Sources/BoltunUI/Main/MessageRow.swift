@@ -7,6 +7,7 @@ struct TimelineItemView: View {
     let item: TimelineItem
     let workspace: Workspace
     var inThread = false
+    var highlightedPostId: String?
 
     var body: some View {
         switch item {
@@ -17,14 +18,14 @@ struct TimelineItemView: View {
         case .replies(let count):
             HStack(spacing: 10) {
                 Text(count == 1 ? "1 reply" : "\(count) replies")
-                    .font(.system(size: 11.5, weight: .semibold))
+                    .scaledFont(11.5, weight: .semibold)
                     .foregroundStyle(Theme.textSecondary)
                 Rectangle().fill(Theme.separator).frame(height: 1)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
         case .post(let model):
-            MessageRow(model: model, workspace: workspace, inThread: inThread)
+            MessageRow(model: model, workspace: workspace, inThread: inThread, highlighted: model.id == highlightedPostId)
                 .equatable()
         }
     }
@@ -37,7 +38,7 @@ struct DateSeparator: View {
         HStack(spacing: 12) {
             Rectangle().fill(Theme.separator).frame(height: 1)
             Text(title)
-                .font(.system(size: 11.5, weight: .semibold))
+                .scaledFont(11.5, weight: .semibold)
                 .foregroundStyle(Theme.textPrimary.opacity(0.8))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 3)
@@ -55,7 +56,7 @@ struct NewMessagesLine: View {
         HStack(spacing: 8) {
             Rectangle().fill(Theme.newMessages).frame(height: 1)
             Text("New Messages")
-                .font(.system(size: 11, weight: .bold))
+                .scaledFont(11, weight: .bold)
                 .foregroundStyle(Theme.newMessages)
         }
         .padding(.horizontal, 16)
@@ -67,19 +68,22 @@ struct MessageRow: View, Equatable {
     let model: MessageRowModel
     let workspace: Workspace
     var inThread = false
+    var highlighted = false
     @State private var hovering: Bool
     @State private var pickerShown = false
+    @Environment(\.fontScale) private var fontScale
 
-    init(model: MessageRowModel, workspace: Workspace, inThread: Bool = false, hovering: Bool = false) {
+    init(model: MessageRowModel, workspace: Workspace, inThread: Bool = false, highlighted: Bool = false, hovering: Bool = false) {
         self.model = model
         self.workspace = workspace
         self.inThread = inThread
+        self.highlighted = highlighted
         _hovering = State(initialValue: hovering)
     }
 
     nonisolated static func == (lhs: MessageRow, rhs: MessageRow) -> Bool {
         MainActor.assumeIsolated {
-            lhs.model == rhs.model && lhs.inThread == rhs.inThread && lhs.workspace === rhs.workspace
+            lhs.model == rhs.model && lhs.inThread == rhs.inThread && lhs.highlighted == rhs.highlighted && lhs.workspace === rhs.workspace
         }
     }
 
@@ -105,7 +109,7 @@ struct MessageRow: View, Equatable {
         .padding(.trailing, 20)
         .padding(.top, model.isContinuation ? 2 : 8)
         .padding(.bottom, 2)
-        .background(background)
+        .background(background.animation(.easeOut(duration: 0.35), value: highlighted))
         .overlay(alignment: .leading) {
             if model.mentionsMe { Rectangle().fill(Theme.mentionRowBar).frame(width: 2) }
         }
@@ -119,6 +123,7 @@ struct MessageRow: View, Equatable {
     }
 
     var background: Color {
+        if highlighted { return Theme.postHighlight }
         if model.mentionsMe { return hovering ? Theme.mentionRowHover : Theme.mentionRow }
         return hovering ? Theme.hover : .clear
     }
@@ -126,15 +131,18 @@ struct MessageRow: View, Equatable {
     @ViewBuilder var gutter: some View {
         if model.isSystem && !model.isContinuation {
             Image(systemName: "info.circle")
-                .font(.system(size: 18))
+                .scaledFont(18)
                 .foregroundStyle(Theme.textSecondary)
                 .frame(width: 36, height: 22)
         } else if model.isContinuation {
-            Text(hovering ? model.timeText.replacingOccurrences(of: " AM", with: "").replacingOccurrences(of: " PM", with: "") : "")
-                .font(.system(size: 10))
+            Text(model.timeText.replacingOccurrences(of: " AM", with: "").replacingOccurrences(of: " PM", with: ""))
+                .scaledFont(10)
                 .foregroundStyle(Theme.textSecondary)
+                .lineLimit(1)
+                .fixedSize()
                 .frame(width: 36, alignment: .trailing)
                 .padding(.top, 3)
+                .opacity(hovering ? 1 : 0)
                 .help(model.fullTimeText)
         } else {
             Avatar(url: model.avatarURL, client: workspace.session.client, name: model.authorName, size: 36)
@@ -144,24 +152,24 @@ struct MessageRow: View, Equatable {
     var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(model.isSystem ? "System" : model.authorName)
-                .font(.system(size: 13.5, weight: .semibold))
+                .scaledFont(13.5, weight: .semibold)
                 .foregroundStyle(Theme.textPrimary)
             if post.overrideUsername != nil || post.props["from_bot"]?.boolValue == true {
                 Text("BOT")
-                    .font(.system(size: 9, weight: .bold))
+                    .scaledFont(9, weight: .bold)
                     .foregroundStyle(Theme.textSecondary)
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1)
                     .background(RoundedRectangle(cornerRadius: 3).fill(Color.white.opacity(0.1)))
             }
             Text(model.timeText)
-                .font(.system(size: 11.5))
+                .scaledFont(11.5)
                 .foregroundStyle(Theme.textSecondary)
                 .help(model.fullTimeText)
             if post.isPinned {
                 Label("Pinned", systemImage: "pin.fill")
                     .labelStyle(.titleAndIcon)
-                    .font(.system(size: 10.5, weight: .medium))
+                    .scaledFont(10.5, weight: .medium)
                     .foregroundStyle(Theme.away)
             }
         }
@@ -170,20 +178,20 @@ struct MessageRow: View, Equatable {
     @ViewBuilder var content: some View {
         if post.isDeleted {
             Text("(message deleted)")
-                .font(Theme.messageFont().italic())
+                .font(Theme.messageFont(scale: fontScale).italic())
                 .foregroundStyle(Theme.textSecondary)
         } else if model.isSystem {
             Text(MessageRenderer.plainText(post.message))
-                .font(Theme.messageFont())
+                .font(Theme.messageFont(scale: fontScale))
                 .foregroundStyle(Theme.textSecondary)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
         } else if !model.blocks.isEmpty || post.isEdited {
             VStack(alignment: .leading, spacing: 2) {
-                MessageBody(blocks: model.blocks, client: workspace.session.client, scale: 1)
+                MessageBody(blocks: model.blocks, client: workspace.session.client)
                 if post.isEdited {
                     Text("Edited")
-                        .font(.system(size: 10.5))
+                        .scaledFont(10.5)
                         .foregroundStyle(Theme.textSecondary)
                         .help("Edited \(TimeFormatting.full(post.editAt.mattermostDate, calendar: workspace.calendar))")
                 }
@@ -200,7 +208,7 @@ struct MessageRow: View, Equatable {
             }
             Button { pickerShown = true } label: {
                 Image(systemName: "face.smiling")
-                    .font(.system(size: 12))
+                    .scaledFont(12)
                     .foregroundStyle(Theme.textSecondary)
                     .frame(width: 30, height: 22)
                     .background(Capsule().fill(Theme.reactionBackground))
@@ -217,7 +225,7 @@ struct MessageRow: View, Equatable {
                 Image(systemName: "arrowshape.turn.up.left.2")
                 Text(model.replyCount == 1 ? "1 reply" : "\(model.replyCount) replies")
             }
-            .font(.system(size: 12, weight: .semibold))
+            .scaledFont(12, weight: .semibold)
             .foregroundStyle(Theme.link)
         }
         .buttonStyle(.plain)
@@ -240,7 +248,7 @@ struct MessageRow: View, Equatable {
                 menuItems
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 13, weight: .medium))
+                    .scaledFont(13, weight: .medium)
                     .foregroundStyle(Theme.textSecondary)
                     .frame(width: 28, height: 28)
             }
@@ -281,7 +289,7 @@ struct ReplyIndicator: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 5) {
-                Image(systemName: "arrowshape.turn.up.left.fill").font(.system(size: 9))
+                Image(systemName: "arrowshape.turn.up.left.fill").scaledFont(9)
                 Group {
                     if context.authorName.isEmpty {
                         Text("Replied in thread")
@@ -292,7 +300,7 @@ struct ReplyIndicator: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
             }
-            .font(.system(size: 12))
+            .scaledFont(12)
             .foregroundStyle(Theme.textSecondary)
         }
         .buttonStyle(.plain)
@@ -310,12 +318,12 @@ struct ReactionChip: View {
             HStack(spacing: 4) {
                 EmojiGlyphView(name: reaction.emojiName, glyph: reaction.glyph, customEmojiId: reaction.customEmojiId, client: client, size: 14)
                 Text("\(reaction.count)")
-                    .font(.system(size: 11.5, weight: .semibold))
+                    .scaledFont(11.5, weight: .semibold)
                     .monospacedDigit()
                     .foregroundStyle(reaction.isMine ? Theme.link : Theme.textSecondary)
             }
             .padding(.horizontal, 7)
-            .frame(height: 22)
+            .frame(minHeight: 22)
             .background(Capsule().fill(reaction.isMine ? Theme.reactionMine : Theme.reactionBackground))
             .overlay(Capsule().strokeBorder(reaction.isMine ? Theme.reactionMineBorder : Color.clear))
         }
@@ -362,6 +370,7 @@ struct EmojiGlyphView: View {
 
 struct AttachmentsView: View {
     let attachments: [JSONValue]
+    @Environment(\.fontScale) private var fontScale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -375,12 +384,12 @@ struct AttachmentsView: View {
                         if !summary.text.isEmpty { Text(summary.text) }
                         ForEach(Array(summary.fields.enumerated()), id: \.offset) { _, field in
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(field.0).font(.system(size: 12, weight: .semibold))
+                                Text(field.0).scaledFont(12, weight: .semibold)
                                 Text(field.1).foregroundStyle(Theme.textPrimary.opacity(0.9))
                             }
                         }
                     }
-                    .font(Theme.messageFont())
+                    .font(Theme.messageFont(scale: fontScale))
                     .foregroundStyle(Theme.textPrimary)
                     .textSelection(.enabled)
                 }
@@ -500,17 +509,17 @@ struct FileChip: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Image(systemName: Self.icon(for: file))
-                    .font(.system(size: 20))
+                    .scaledFont(20)
                     .foregroundStyle(Theme.accent)
                     .frame(width: 28)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(file.name)
-                        .font(.system(size: 12.5, weight: .semibold))
+                        .scaledFont(12.5, weight: .semibold)
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Text([file.extension.uppercased(), FileSizeText.text(file.size)].filter { !$0.isEmpty }.joined(separator: " · "))
-                        .font(.system(size: 11))
+                        .scaledFont(11)
                         .foregroundStyle(Theme.textSecondary)
                 }
                 Spacer(minLength: 8)
@@ -545,7 +554,7 @@ struct EmojiPicker: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(32), spacing: 4), count: 8), spacing: 4) {
                     ForEach(choices, id: \.name) { choice in
                         Button { onPick(choice.name) } label: {
-                            Text(choice.glyph).font(.system(size: 21)).frame(width: 32, height: 32)
+                            Text(choice.glyph).scaledFont(21).frame(width: 32, height: 32)
                         }
                         .buttonStyle(.plain)
                         .help(":\(choice.name):")
@@ -554,7 +563,7 @@ struct EmojiPicker: View {
             }
             .frame(height: 200)
             if choices.isEmpty {
-                Text("No emoji found").font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
+                Text("No emoji found").scaledFont(12).foregroundStyle(Theme.textSecondary)
             }
         }
         .padding(10)

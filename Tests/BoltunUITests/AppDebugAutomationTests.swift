@@ -11,9 +11,11 @@ final class FakeAutomationHost: AutomationHost {
     private(set) var shown = 0
     private(set) var terminated = 0
     private(set) var notifications: [(String, String)] = []
+    private(set) var activated: [NotificationRoute] = []
 
     func showMainWindow() { shown += 1 }
     func deliverTestNotification(title: String, body: String) async { notifications.append((title, body)) }
+    func activateNotification(_ route: NotificationRoute) async { activated.append(route) }
     func terminate() { terminated += 1 }
 }
 

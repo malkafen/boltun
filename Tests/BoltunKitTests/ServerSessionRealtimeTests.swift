@@ -116,7 +116,7 @@ import Testing
         session.apply(Fixtures.posted(Fixtures.post("n1", channel: "c-new", user: "u2", message: "welcome", createAt: 1000)))
         #expect(await eventually { session.channels["c-new"] != nil && session.members["c-new"] != nil })
         #expect(session.unread(channelId: "c-new").unread)
-        #expect(server.transport.count("GET", "users/me/teams/t1/channels/categories") == 2)
+        #expect(await eventually { server.transport.count("GET", "users/me/teams/t1/channels/categories") == 2 })
         session.stop()
     }
 

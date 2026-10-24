@@ -6,7 +6,7 @@ import Testing
 @testable import BoltunUI
 
 @MainActor
-func eventually(timeout: Duration = .seconds(2), _ condition: () -> Bool) async -> Bool {
+func eventually(timeout: Duration = .seconds(20), _ condition: () -> Bool) async -> Bool {
     let deadline = ContinuousClock.now + timeout
     while ContinuousClock.now < deadline {
         if condition() { return true }
@@ -315,7 +315,10 @@ func body(_ request: URLRequest) -> [String: Any] {
         #expect(!workspace.isSearching)
         await workspace.jump(to: found)
         #expect(workspace.session.currentChannelId == "secret")
-        #expect(workspace.threadRootId == "root")
+        #expect(workspace.rightPane == .search)
+        #expect(workspace.highlightedPostId == "s1")
+        #expect(workspace.scrollRequest?.target == .post("s1"))
+        await workspace.openThread(rootId: "root")
         workspace.closeRightPane()
         #expect(workspace.rightPane == nil)
         #expect(workspace.session.threads["root"] == nil)

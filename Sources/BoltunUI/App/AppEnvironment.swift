@@ -73,6 +73,9 @@ public final class AppEnvironment: AutomationHost {
         let dock = self.dock
         model.isAppActive = { dock.isAppActive }
         notifications.install()
+        if UserDefaults.standard.bool(forKey: DebugCommand.defaultsKey) {
+            notifications.onDeliver = { DebugAutomation.appendToLog("notification \($0.channelId) \($0.title): \($0.body)") }
+        }
         badge.start()
         let model = self.model
         let notifications = self.notifications
@@ -122,6 +125,10 @@ public final class AppEnvironment: AutomationHost {
 
     public func terminate() {
         NSApp.terminate(nil)
+    }
+
+    public func activateNotification(_ route: NotificationRoute) async {
+        await notifications.activate(route)
     }
 
     func syncLoginItem() {

@@ -96,7 +96,7 @@ import Testing
     @Test func typingIndicatorsExpire() async {
         let server = MockServer()
         let session = await server.startedSession()
-        session.typingTimeout = .milliseconds(80)
+        session.typingTimeout = .seconds(120)
         session.apply(Fixtures.wsEvent("typing", data: ["user_id": "u2", "parent_id": ""], channel: "c-town"))
         session.apply(Fixtures.wsEvent("typing", data: ["user_id": "me1", "parent_id": ""], channel: "c-town"))
         session.apply(Fixtures.wsEvent("typing", data: ["user_id": "u3", "parent_id": "p5"], channel: "c-town"))
@@ -104,6 +104,9 @@ import Testing
         #expect(session.typingUsers(channelId: "c-town") == ["bob"])
         #expect(await eventually { session.users["u3"] != nil })
         #expect(session.typingUsers(channelId: "c-town", parentId: "p5") == ["carol"])
+        session.typingTimeout = .milliseconds(50)
+        session.apply(Fixtures.wsEvent("typing", data: ["user_id": "u2", "parent_id": ""], channel: "c-town"))
+        session.apply(Fixtures.wsEvent("typing", data: ["user_id": "u3", "parent_id": "p5"], channel: "c-town"))
         #expect(await eventually { session.typing.isEmpty })
         #expect(session.typingUsers(channelId: "c-town").isEmpty)
         session.stop()

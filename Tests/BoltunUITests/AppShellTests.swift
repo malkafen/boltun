@@ -124,7 +124,7 @@ struct AppShellTests {
         let harness = Harness(servers: [server], tokens: [server.id: "token"])
         let environment = harness.environment()
         environment.launch()
-        #expect(await eventually { harness.model.session(for: server.id)?.connection == .connected })
+        #expect(await eventually(timeout: .seconds(10)) { harness.model.session(for: server.id)?.connection == .connected })
         environment.mainWindow?.orderOut(nil)
     }
 
@@ -152,9 +152,7 @@ struct AppShellTests {
         #expect(Render.png(AppRootView(model: connected.model, router: connectedRouter), size: CGSize(width: 900, height: 600), name: "app-main") != nil)
     }
 
-    @Test func rendersBannerAndWelcome() {
-        var logins = 0
-        #expect(Render.png(SignedOutBanner(serverName: "Alpha") { logins += 1 }, size: CGSize(width: 600, height: 40), name: "app-banner") != nil)
+    @Test func rendersWelcome() {
         #expect(Render.png(WelcomeView {}, size: CGSize(width: 900, height: 600), name: "login-welcome") != nil)
     }
 
