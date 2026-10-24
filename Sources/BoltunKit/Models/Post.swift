@@ -157,6 +157,7 @@ public struct Post: Codable, Hashable, Identifiable, Sendable {
     public var pendingPostId: String
     public var replyCount: Int
     public var lastReplyAt: Int64
+    public var participantIds: [String]
     public var metadata: PostMetadata
 
     public init(
@@ -177,6 +178,7 @@ public struct Post: Codable, Hashable, Identifiable, Sendable {
         pendingPostId: String = "",
         replyCount: Int = 0,
         lastReplyAt: Int64 = 0,
+        participantIds: [String] = [],
         metadata: PostMetadata = PostMetadata()
     ) {
         self.id = id
@@ -196,6 +198,7 @@ public struct Post: Codable, Hashable, Identifiable, Sendable {
         self.pendingPostId = pendingPostId
         self.replyCount = replyCount
         self.lastReplyAt = lastReplyAt
+        self.participantIds = participantIds
         self.metadata = metadata
     }
 
@@ -213,6 +216,7 @@ public struct Post: Codable, Hashable, Identifiable, Sendable {
         case pendingPostId = "pending_post_id"
         case replyCount = "reply_count"
         case lastReplyAt = "last_reply_at"
+        case participantIds = "participants"
     }
 
     public init(from decoder: Decoder) throws {
@@ -234,7 +238,25 @@ public struct Post: Codable, Hashable, Identifiable, Sendable {
         pendingPostId = c.value(.pendingPostId, default: "")
         replyCount = c.int(.replyCount)
         lastReplyAt = c.int64(.lastReplyAt)
+        participantIds = Self.decodeParticipants(c)
         metadata = c.value(.metadata, default: PostMetadata())
+    }
+
+    static func decodeParticipants(_ c: KeyedDecodingContainer<CodingKeys>) -> [String] {
+        if let users = try? c.decodeIfPresent([ParticipantReference].self, forKey: .participantIds) {
+            return users.map(\.id).filter { !$0.isEmpty }
+        }
+        return c.value(.participantIds, default: [])
+    }
+
+    public func mergingThreadSummary(from old: Post) -> Post {
+        var merged = self
+        if merged.participantIds.isEmpty { merged.participantIds = old.participantIds }
+        if merged.replyCount == 0 && merged.lastReplyAt == 0 {
+            merged.replyCount = old.replyCount
+            merged.lastReplyAt = old.lastReplyAt
+        }
+        return merged
     }
 
     public var isReply: Bool { !rootId.isEmpty }
@@ -263,6 +285,10 @@ public struct Post: Codable, Hashable, Identifiable, Sendable {
         }
         return order.map { ReactionSummary(emojiName: $0, userIds: users[$0] ?? []) }
     }
+}
+
+struct ParticipantReference: Decodable {
+    var id: String
 }
 
 public struct ReactionSummary: Hashable, Sendable {

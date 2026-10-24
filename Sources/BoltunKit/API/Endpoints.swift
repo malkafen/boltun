@@ -113,7 +113,7 @@ public extension APIClient {
         try await sendVoid(.delete, "channels/\(channelId)/members/\(userId)")
     }
 
-    func posts(channelId: String, page: PostPage) async throws -> PostList {
+    func posts(channelId: String, page: PostPage, collapsedThreads: Bool = false) async throws -> PostList {
         var query: [String: String] = [:]
         switch page {
         case .latest(let perPage):
@@ -124,6 +124,10 @@ public extension APIClient {
             query = ["after": postId, "per_page": String(perPage)]
         case .since(let time):
             query = ["since": String(time)]
+        }
+        if collapsedThreads {
+            query["collapsedThreads"] = "true"
+            query["collapsedThreadsExtended"] = "false"
         }
         return try await send(PostList.self, .get, "channels/\(channelId)/posts", query: query)
     }

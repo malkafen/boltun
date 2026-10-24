@@ -100,7 +100,13 @@ struct MessageRow: View, Equatable {
                     if !post.attachments.isEmpty { AttachmentsView(attachments: post.attachments) }
                     if !post.metadata.files.isEmpty { FilesView(files: post.metadata.files, workspace: workspace) }
                     if !model.reactions.isEmpty { reactions }
-                    if model.replyCount > 0 && !inThread { replyButton }
+                    if !inThread {
+                        if let thread = model.thread {
+                            ThreadSummaryButton(summary: thread, client: workspace.session.client) { open(thread: post.id) }
+                        } else if model.replyCount > 0 {
+                            replyButton
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -279,6 +285,49 @@ struct MessageRow: View, Equatable {
 
     func open(thread rootId: String) {
         Task { await workspace.openThread(rootId: rootId) }
+    }
+}
+
+struct ThreadSummaryButton: View {
+    let summary: ThreadSummary
+    let client: APIClient?
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                HStack(spacing: -6) {
+                    ForEach(summary.participants) { participant in
+                        Avatar(url: participant.avatarURL, client: client, name: participant.name, size: 20)
+                            .overlay(Circle().strokeBorder(Theme.content, lineWidth: 1.5))
+                            .help(participant.name)
+                    }
+                }
+                Text(summary.replyText)
+                    .scaledFont(12.5, weight: .semibold)
+                    .foregroundStyle(Theme.link)
+                if !summary.lastReplyText.isEmpty {
+                    Text(summary.lastReplyText)
+                        .scaledFont(11.5)
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(1)
+                }
+                if summary.hasNewReplies {
+                    Circle().fill(Theme.link).frame(width: 7, height: 7).help("New replies")
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? Theme.hover : .clear))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(hovering ? Theme.border : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .padding(.leading, -6)
+        .padding(.top, 2)
+        .help("Open thread")
     }
 }
 

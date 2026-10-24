@@ -31,10 +31,10 @@ public struct ChannelUnread: Hashable, Sendable {
 public enum SidebarBuilder {
     public static let directMessageLimit = 40
 
-    public static func unread(channel: Channel, member: ChannelMember?) -> ChannelUnread {
+    public static func unread(channel: Channel, member: ChannelMember?, collapsedThreads: Bool = false) -> ChannelUnread {
         guard let member else { return .none }
-        let unread = channel.totalMsgCount > member.msgCount && !member.isMuted
-        return ChannelUnread(unread: unread, mentions: member.mentionCount)
+        let hasNewMessages = collapsedThreads ? channel.totalMsgCountRoot > member.msgCountRoot : channel.totalMsgCount > member.msgCount
+        return ChannelUnread(unread: hasNewMessages && !member.isMuted, mentions: member.mentionCount)
     }
 
     public static func sections(
@@ -44,7 +44,8 @@ public enum SidebarBuilder {
         hiddenDirect: Set<String>,
         displayName: (Channel) -> String,
         currentChannelId: String?,
-        directMessageLimit limit: Int? = SidebarBuilder.directMessageLimit
+        directMessageLimit limit: Int? = SidebarBuilder.directMessageLimit,
+        collapsedThreads: Bool = false
     ) -> [SidebarSection] {
         func visible(_ id: String) -> Bool {
             guard let channel = channels[id] else { return false }
@@ -73,7 +74,7 @@ public enum SidebarBuilder {
             ids = sort(ids, category: category, channels: channels, displayName: displayName)
             if category.type == .directMessages, let limit, ids.count > limit {
                 let overflow = ids.dropFirst(limit).filter { id in
-                    id == currentChannelId || (channels[id].map { unread(channel: $0, member: members[id]).unread } ?? false)
+                    id == currentChannelId || (channels[id].map { unread(channel: $0, member: members[id], collapsedThreads: collapsedThreads).unread } ?? false)
                 }
                 ids = Array(ids.prefix(limit)) + overflow
             }

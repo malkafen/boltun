@@ -62,6 +62,7 @@ final class Workspace {
     var scrollRequest: ScrollRequest?
     var highlightedPostId: String?
     var searchFocusRequest = 0
+    var threadSeenAt: [String: Int64] = [:]
     @ObservationIgnored var scrollReport = ScrollReport()
     @ObservationIgnored var scrollSequence = 0
     @ObservationIgnored var handledScrollSequence = 0
@@ -107,15 +108,27 @@ final class Workspace {
     }
 
     func openThread(rootId: String) async {
-        if let previous = threadRootId, previous != rootId { session.closeThread(rootId: previous) }
+        if let previous = threadRootId, previous != rootId {
+            markThreadSeen(previous)
+            session.closeThread(rootId: previous)
+        }
+        markThreadSeen(rootId)
         rightPane = .thread(rootId)
         lastThreadRootId = rootId
         await session.openThread(rootId: rootId)
     }
 
     func closeRightPane() {
-        if let rootId = threadRootId { session.closeThread(rootId: rootId) }
+        if let rootId = threadRootId {
+            markThreadSeen(rootId)
+            session.closeThread(rootId: rootId)
+        }
         rightPane = nil
+    }
+
+    func markThreadSeen(_ rootId: String) {
+        let seen = max(now().mattermostMillis, session.posts[rootId]?.lastReplyAt ?? 0)
+        if (threadSeenAt[rootId] ?? 0) < seen { threadSeenAt[rootId] = seen }
     }
 
     func search() async {
@@ -323,10 +336,14 @@ final class Workspace {
 
     var mentionKeys: [String] { markupContext().mentionKeys }
 
-    func timelineContext(lastViewedAt: Int64, showReplyContext: Bool) -> TimelineContext {
+    func timelineContext(lastViewedAt: Int64, showReplyContext: Bool, collapsedThreads: Bool = false) -> TimelineContext {
         let session = session
         let markup = markupContext()
         let cache = renderCache
+        let seen = threadSeenAt
+        let avatarURL: (String) -> URL? = { userId in
+            session.client.profileImageURL(userId: userId, lastPictureUpdate: session.users[userId]?.lastPictureUpdate ?? 0)
+        }
         return TimelineContext(
             myId: session.myId,
             myUsername: session.me?.username ?? "",
@@ -335,13 +352,17 @@ final class Workspace {
             now: now(),
             calendar: calendar,
             showReplyContext: showReplyContext,
+            collapsedThreads: collapsedThreads,
+            openThreadId: threadRootId,
             displayName: { session.displayName(for: $0) },
             userName: { session.displayName(userId: $0) },
             post: { session.posts[$0] },
             avatarURL: { post in
                 guard post.overrideUsername == nil else { return nil }
-                return session.client.profileImageURL(userId: post.userId, lastPictureUpdate: session.users[post.userId]?.lastPictureUpdate ?? 0)
+                return avatarURL(post.userId)
             },
+            userAvatarURL: avatarURL,
+            threadSeenAt: { seen[$0] ?? 0 },
             customEmojiId: { session.customEmojis[$0]?.id },
             render: { cache.blocks(for: $0, context: markup) }
         )
@@ -351,7 +372,7 @@ final class Workspace {
         let timeline = session.timelines[channelId] ?? ChannelTimeline()
         return TimelineBuilder.items(
             posts: session.timelinePosts(channelId: channelId),
-            context: timelineContext(lastViewedAt: timeline.lastViewedAtOnOpen, showReplyContext: true)
+            context: timelineContext(lastViewedAt: timeline.lastViewedAtOnOpen, showReplyContext: !session.collapsedThreads, collapsedThreads: session.collapsedThreads)
         )
     }
 

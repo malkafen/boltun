@@ -56,17 +56,23 @@ struct ThreadPane: View {
                     .foregroundStyle(Theme.textSecondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(items) { item in
-                            TimelineItemView(item: item, workspace: workspace, inThread: true, highlightedPostId: workspace.highlightedPostId)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(items) { item in
+                                TimelineItemView(item: item, workspace: workspace, inThread: true, highlightedPostId: workspace.highlightedPostId)
+                            }
                         }
+                        .padding(.vertical, 8)
                     }
-                    .padding(.vertical, 8)
+                    .defaultScrollAnchor(.top, for: .alignment)
+                    .defaultScrollAnchor(.bottom, for: .initialOffset)
+                    .defaultScrollAnchor(.bottom, for: .sizeChanges)
+                    .onChange(of: ThreadScrollTarget.target(highlighted: workspace.highlightedPostId, items: items), initial: true) { _, target in
+                        guard let target else { return }
+                        withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(target, anchor: .center) }
+                    }
                 }
-                .defaultScrollAnchor(.top, for: .alignment)
-                .defaultScrollAnchor(.bottom, for: .initialOffset)
-                .defaultScrollAnchor(.bottom, for: .sizeChanges)
             }
             if let root {
                 LiveTypingIndicator(session: session, channelId: root.channelId, parentId: rootId)
@@ -74,6 +80,13 @@ struct ThreadPane: View {
                     .id(rootId)
             }
         }
+    }
+}
+
+enum ThreadScrollTarget {
+    static func target(highlighted: String?, items: [TimelineItem]) -> String? {
+        guard let highlighted, items.contains(where: { $0.id == highlighted }) else { return nil }
+        return highlighted
     }
 }
 

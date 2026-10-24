@@ -62,10 +62,15 @@ public final class ServerSession {
     public internal(set) var customEmojis: [String: CustomEmoji] = [:]
     public internal(set) var lastError: String?
     public internal(set) var pendingPostIds: Set<String> = []
+    public internal(set) var collapsedThreads = false
+    public var teamLayout = TeamLayout() {
+        didSet { if teamLayout != oldValue { onTeamLayoutChange?(teamLayout) } }
+    }
 
     @ObservationIgnored public var onNotification: ((MentionNotification) -> Void)?
     @ObservationIgnored public var onUnauthorized: (() -> Void)?
     @ObservationIgnored public var onSelectionChange: ((String?, String?) -> Void)?
+    @ObservationIgnored public var onTeamLayoutChange: ((TeamLayout) -> Void)?
     @ObservationIgnored public var isAppActive: () -> Bool = { true }
     @ObservationIgnored public var now: () -> Date = Date.init
     @ObservationIgnored public var typingTimeout: Duration = .seconds(6)
@@ -102,6 +107,24 @@ public final class ServerSession {
 
     public var currentTeam: Team? { teams.first { $0.id == currentTeamId } }
 
+    public var teamSections: TeamSections { teamLayout.sections(teams) }
+
+    public var orderedTeams: [Team] { teamLayout.ordered(teams) }
+
+    public func isFavorite(teamId: String) -> Bool { teamLayout.isFavorite(teamId) }
+
+    public func moveTeam(_ teamId: String, to targetId: String) {
+        teamLayout.move(teamId, to: targetId, in: teams)
+    }
+
+    public func moveTeamToEnd(_ teamId: String, favorite: Bool) {
+        teamLayout.moveToEnd(teamId, favorite: favorite, in: teams)
+    }
+
+    public func setFavorite(teamId: String, favorite: Bool) {
+        teamLayout.setFavorite(teamId, favorite, in: teams)
+    }
+
     public var currentChannel: Channel? { currentChannelId.flatMap { channels[$0] } }
 
     public func displayName(userId: String) -> String {
@@ -126,27 +149,27 @@ public final class ServerSession {
 
     public func unread(channelId: String) -> ChannelUnread {
         guard let channel = channels[channelId] else { return .none }
-        return SidebarBuilder.unread(channel: channel, member: members[channelId])
+        return SidebarBuilder.unread(channel: channel, member: members[channelId], collapsedThreads: collapsedThreads)
     }
 
     public func teamUnread(teamId: String) -> ChannelUnread {
         if loadedTeams.contains(teamId) {
             var result = ChannelUnread()
             for (id, channel) in channels where channel.teamId == teamId {
-                let unread = SidebarBuilder.unread(channel: channel, member: members[id])
+                let unread = SidebarBuilder.unread(channel: channel, member: members[id], collapsedThreads: collapsedThreads)
                 result.unread = result.unread || unread.unread
                 result.mentions += unread.mentions
             }
             return result
         }
         guard let value = teamUnreads[teamId] else { return .none }
-        return ChannelUnread(unread: value.msgCount > 0, mentions: value.mentionCount)
+        return ChannelUnread(unread: (collapsedThreads ? value.msgCountRoot : value.msgCount) > 0, mentions: value.mentionCount)
     }
 
     public var directUnread: ChannelUnread {
         var result = ChannelUnread()
         for (id, channel) in channels where channel.type.isDirectOrGroup {
-            let unread = SidebarBuilder.unread(channel: channel, member: members[id])
+            let unread = SidebarBuilder.unread(channel: channel, member: members[id], collapsedThreads: collapsedThreads)
             result.unread = result.unread || unread.unread
             result.mentions += unread.mentions
         }
@@ -188,7 +211,8 @@ public final class ServerSession {
             hiddenDirect: hiddenDirectChannelIds,
             displayName: { [unowned self] in self.displayName(channel: $0) },
             currentChannelId: currentChannelId,
-            directMessageLimit: SidebarBuilder.directMessageLimit(preference: preferenceValue(category: PreferenceCategory.sidebarSettings, name: PreferenceName.limitVisibleDirectMessages))
+            directMessageLimit: SidebarBuilder.directMessageLimit(preference: preferenceValue(category: PreferenceCategory.sidebarSettings, name: PreferenceName.limitVisibleDirectMessages)),
+            collapsedThreads: collapsedThreads
         )
     }
 
@@ -199,7 +223,24 @@ public final class ServerSession {
     public func isPending(postId: String) -> Bool { pendingPostIds.contains(postId) }
 
     public func timelinePosts(channelId: String) -> [Post] {
-        (timelines[channelId]?.postIds ?? []).compactMap { posts[$0] }
+        let list = (timelines[channelId]?.postIds ?? []).compactMap { posts[$0] }
+        return collapsedThreads ? list.filter { !$0.isReply } : list
+    }
+
+    func belongsInTimeline(_ post: Post) -> Bool {
+        !collapsedThreads || !post.isReply
+    }
+
+    public func setCollapsedThreads(_ enabled: Bool) async {
+        guard collapsedThreads != enabled else { return }
+        collapsedThreads = enabled
+        let current = currentChannelId
+        for id in timelines.keys where id != current { timelines[id] = nil }
+        guard let current, let existing = timelines[current] else { return }
+        var reset = ChannelTimeline()
+        reset.lastViewedAtOnOpen = existing.lastViewedAtOnOpen
+        timelines[current] = reset
+        await loadLatest(channelId: current)
     }
 
     public func threadPosts(rootId: String) -> [Post] {
@@ -319,7 +360,7 @@ public final class ServerSession {
             } else {
                 currentTeamId = nil
                 currentChannelId = nil
-                if let first = teams.first { await selectTeam(first.id) }
+                if let first = orderedTeams.first { await selectTeam(first.id) }
             }
         }
         if let channelId = currentChannelId, timelines[channelId] != nil {
@@ -449,7 +490,7 @@ public final class ServerSession {
         timelines[channelId] = timeline
         let result: Result<PostList, Error>
         do {
-            result = .success(try await client.posts(channelId: channelId, page: .latest(perPage: pageSize)))
+            result = .success(try await client.posts(channelId: channelId, page: .latest(perPage: pageSize), collapsedThreads: collapsedThreads))
         } catch {
             result = .failure(error)
         }
@@ -458,7 +499,7 @@ public final class ServerSession {
         switch result {
         case .success(let list):
             ingest(list)
-            let fetched = list.order.reversed().filter { posts[$0] != nil }
+            let fetched = list.order.reversed().filter { id in posts[id].map(belongsInTimeline) ?? false }
             let fetchedIds = Set(fetched)
             let newestFetched = fetched.last.flatMap { posts[$0]?.createAt } ?? Int64.min
             let newer = current.postIds.filter { id in
@@ -482,7 +523,7 @@ public final class ServerSession {
         timelines[channelId] = timeline
         let result: Result<PostList, Error>
         do {
-            result = .success(try await client.posts(channelId: channelId, page: .before(postId: oldest, perPage: pageSize)))
+            result = .success(try await client.posts(channelId: channelId, page: .before(postId: oldest, perPage: pageSize), collapsedThreads: collapsedThreads))
         } catch {
             result = .failure(error)
         }
@@ -492,7 +533,7 @@ public final class ServerSession {
         case .success(let list):
             ingest(list)
             let existing = Set(current.postIds)
-            let older = list.order.reversed().filter { !existing.contains($0) && posts[$0] != nil }
+            let older = list.order.reversed().filter { id in !existing.contains(id) && (posts[id].map(belongsInTimeline) ?? false) }
             current.postIds.insert(contentsOf: older, at: 0)
             current.hasMoreOlder = list.order.count >= pageSize
         case .failure(let error):
@@ -519,7 +560,7 @@ public final class ServerSession {
         timelines[channelId] = timeline
         let result: Result<PostList, Error>
         do {
-            result = .success(try await client.posts(channelId: channelId, page: .since(since)))
+            result = .success(try await client.posts(channelId: channelId, page: .since(since), collapsedThreads: collapsedThreads))
         } catch {
             result = .failure(error)
         }
@@ -872,8 +913,12 @@ public final class ServerSession {
     }
 
     func store(_ post: Post) {
-        if let existing = posts[post.id], existing.updateAt > post.updateAt { return }
-        posts[post.id] = post
+        guard let existing = posts[post.id] else {
+            posts[post.id] = post
+            return
+        }
+        if existing.updateAt > post.updateAt { return }
+        posts[post.id] = post.mergingThreadSummary(from: existing)
     }
 
     func ingest(_ list: PostList) {
@@ -881,6 +926,7 @@ public final class ServerSession {
         for post in list.posts.values where !deletedPostIds.contains(post.id) {
             store(post)
             userIds.insert(post.userId)
+            userIds.formUnion(post.participantIds)
             for emoji in post.metadata.emojis { customEmojis[emoji.name] = emoji }
             for reaction in post.metadata.reactions { userIds.insert(reaction.userId) }
         }
@@ -889,7 +935,7 @@ public final class ServerSession {
     }
 
     func insertIntoTimeline(_ post: Post) {
-        guard var timeline = timelines[post.channelId], !timeline.postIds.contains(post.id) else { return }
+        guard belongsInTimeline(post), var timeline = timelines[post.channelId], !timeline.postIds.contains(post.id) else { return }
         if timeline.loaded, timeline.hasMoreOlder, let first = timeline.postIds.first.flatMap({ posts[$0] }), post.createAt < first.createAt {
             return
         }
@@ -911,6 +957,8 @@ public final class ServerSession {
         if !existed, !post.rootId.isEmpty, var root = posts[post.rootId] {
             root.replyCount += 1
             root.lastReplyAt = max(root.lastReplyAt, post.createAt)
+            root.participantIds.removeAll { $0 == post.userId }
+            root.participantIds.append(post.userId)
             posts[post.rootId] = root
         }
         if !existed, var channel = channels[post.channelId] {

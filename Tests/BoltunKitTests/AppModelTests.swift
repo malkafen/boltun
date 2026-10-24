@@ -225,7 +225,10 @@ struct AppHarness {
         #expect(app.totalMentions == 0)
         #expect(app.badgeLabel == "•")
         for session in app.sessions.values {
-            for (id, channel) in session.channels { session.members[id]?.msgCount = channel.totalMsgCount }
+            for (id, channel) in session.channels {
+                session.members[id]?.msgCount = channel.totalMsgCount
+                session.members[id]?.msgCountRoot = channel.totalMsgCountRoot
+            }
         }
         #expect(app.hasUnread == false)
         #expect(app.badgeLabel == nil)

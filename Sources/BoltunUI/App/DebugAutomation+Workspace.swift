@@ -11,6 +11,7 @@ struct AutomationUIState: Codable, Equatable, Sendable {
         var reactions: [String]
         var files: Int
         var edited: Bool
+        var replyCount: Int = 0
     }
 
     struct Composer: Codable, Equatable, Sendable {
@@ -48,6 +49,7 @@ struct AutomationUIState: Codable, Equatable, Sendable {
     var workspaces: Int
     var cachedSessionPosts: Int
     var editors: [Editor] = []
+    var collapsedThreads = false
 
     struct Editor: Codable, Equatable, Sendable {
         var spellChecking: Bool
@@ -178,9 +180,26 @@ extension DebugAutomation {
         case .link(let url):
             await workspace.handle(link: url)
             return ""
+        case .teamFavorite(let name, let on):
+            let team = try team(named: name, in: session)
+            session.setFavorite(teamId: team.id, favorite: on)
+            return session.orderedTeams.map(\.name).joined(separator: ",")
+        case .teamMove(let name, let target):
+            let team = try team(named: name, in: session)
+            switch target {
+            case .team(let targetName): session.moveTeam(team.id, onto: .team(try self.team(named: targetName, in: session).id))
+            case .endOfFavorites: session.moveTeam(team.id, onto: .endOfFavorites)
+            case .endOfOthers: session.moveTeam(team.id, onto: .endOfOthers)
+            }
+            return session.orderedTeams.map(\.name).joined(separator: ",")
         default:
             throw AutomationError.invalidCommand
         }
+    }
+
+    func team(named name: String, in session: ServerSession) throws -> Team {
+        guard let team = session.team(named: name) else { throw AutomationError.failed("no team \(name)") }
+        return team
     }
 
     func runCommand(_ name: String, number: Int?, workspace: Workspace) async throws -> String {
@@ -282,7 +301,8 @@ extension DebugAutomation {
             error: workspace.visibleError,
             workspaces: router.workspaces.count,
             cachedSessionPosts: session.posts.count,
-            editors: Self.editors(in: host?.mainWindow?.contentView)
+            editors: Self.editors(in: host?.mainWindow?.contentView),
+            collapsedThreads: session.collapsedThreads
         )
     }
 
@@ -302,7 +322,8 @@ extension DebugAutomation {
             rootId: post.rootId,
             reactions: post.reactionSummary.map { "\($0.emojiName):\($0.count)" },
             files: post.metadata.files.count,
-            edited: post.isEdited
+            edited: post.isEdited,
+            replyCount: post.replyCount
         )
     }
 

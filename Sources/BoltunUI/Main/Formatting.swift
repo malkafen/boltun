@@ -24,6 +24,17 @@ enum TimeFormatting {
         return formatter(sameYear ? "MMM d" : "MMM d, yyyy", calendar: calendar).string(from: date)
     }
 
+    static func relative(_ date: Date, now: Date, calendar: Calendar) -> String {
+        let seconds = now.timeIntervalSince(date)
+        if seconds < 60 { return "just now" }
+        if seconds < 3600 { return "\(Int(seconds / 60)) min ago" }
+        if calendar.isDate(date, inSameDayAs: now) { return "\(Int(seconds / 3600)) hr ago" }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(date, inSameDayAs: yesterday) {
+            return "yesterday"
+        }
+        return short(date, now: now, calendar: calendar)
+    }
+
     private static let cache = FormatterCache()
 
     private static func formatter(_ format: String, calendar: Calendar) -> DateFormatter {

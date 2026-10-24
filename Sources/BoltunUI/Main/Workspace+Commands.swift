@@ -77,9 +77,16 @@ extension Workspace {
 
     func highlight(postId: String) async {
         guard let post = session.posts[postId] else { return }
-        await reveal(post)
+        if session.collapsedThreads && post.isReply {
+            if threadRootId != post.rootId { await openThread(rootId: post.rootId) }
+            let root = session.posts[post.rootId] ?? post
+            await reveal(root)
+            requestScroll(.post(root.id), channelId: post.channelId)
+        } else {
+            await reveal(post)
+            requestScroll(.post(postId), channelId: post.channelId)
+        }
         highlightedPostId = postId
-        requestScroll(.post(postId), channelId: post.channelId)
         highlightTask?.cancel()
         let duration = highlightDuration
         highlightTask = Task { [weak self] in

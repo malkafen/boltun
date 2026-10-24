@@ -7,7 +7,10 @@ public final class AppModel {
     public private(set) var servers: [ServerConfig]
     public private(set) var sessions: [UUID: ServerSession] = [:]
     public var settings: AppSettings {
-        didSet { persist() }
+        didSet {
+            persist()
+            if settings.collapsedThreads != oldValue.collapsedThreads { applyCollapsedThreads() }
+        }
     }
     public private(set) var selectedServerId: UUID?
     public private(set) var needsLogin: Set<UUID> = []
@@ -96,6 +99,11 @@ public final class AppModel {
         session.onSelectionChange = { [weak self] teamId, channelId in
             self?.rememberSelection(serverId: server.id, teamId: teamId, channelId: channelId)
         }
+        session.collapsedThreads = settings.collapsedThreads
+        session.teamLayout = server.teamLayout
+        session.onTeamLayoutChange = { [weak self] layout in
+            self?.rememberTeamLayout(serverId: server.id, layout: layout)
+        }
         if token == nil { needsLogin.insert(server.id) }
         sessions[server.id] = session
         return session
@@ -105,7 +113,7 @@ public final class AppModel {
         guard let session = sessions[serverId], session.connection == .connected, session.currentTeamId == nil,
               let server = servers.first(where: { $0.id == serverId })
         else { return }
-        let teamId = server.lastTeamId.flatMap { id in session.teams.contains { $0.id == id } ? id : nil } ?? session.teams.first?.id
+        let teamId = server.lastTeamId.flatMap { id in session.teams.contains { $0.id == id } ? id : nil } ?? session.orderedTeams.first?.id
         guard let teamId else { return }
         await session.selectTeam(teamId, channelId: server.lastChannelByTeam[teamId])
     }
@@ -115,6 +123,19 @@ public final class AppModel {
         servers[index].lastTeamId = teamId
         if let teamId, let channelId { servers[index].lastChannelByTeam[teamId] = channelId }
         persist()
+    }
+
+    func rememberTeamLayout(serverId: UUID, layout: TeamLayout) {
+        guard let index = servers.firstIndex(where: { $0.id == serverId }), servers[index].teamLayout != layout else { return }
+        servers[index].teamLayout = layout
+        persist()
+    }
+
+    func applyCollapsedThreads() {
+        let enabled = settings.collapsedThreads
+        for session in sessions.values {
+            Task { await session.setCollapsedThreads(enabled) }
+        }
     }
 
     public func select(serverId: UUID) async {
