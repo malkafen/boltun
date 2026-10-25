@@ -57,6 +57,7 @@ final class Workspace {
     var pendingDeletion: Post?
     var pendingBurn: Post?
     var previewFile: FileInfo?
+    var previewGallery: [FileInfo] = []
     var notificationPreferences: ChannelNotificationsTarget?
     var downloading: Set<String> = []
     var recentEmojis: [String] = []
@@ -337,6 +338,11 @@ final class Workspace {
         pendingBurn = nil
         await session.burn(postId: post.id)
         if threadRootId == post.id { rightPane = nil }
+    }
+
+    func previewImage(_ file: FileInfo, in gallery: [FileInfo] = []) {
+        previewGallery = ImageGallery.normalized(ImageGallery.images(gallery), selecting: file)
+        previewFile = file
     }
 
     @discardableResult

@@ -42,7 +42,7 @@ From the Linux dev host, run the same commands through `ssh macbox@192.168.5.90`
 
 | Command | Effect |
 | --- | --- |
-| `snapshot?path=/tmp/x.png[&window=main\|sheet\|settings\|key\|popover]` | Renders a window to PNG. `sheet` is the sheet attached to the main window. `popover` renders the main window with every open popover drawn over it at its screen position, so the profile popover can be captured without screen recording access. |
+| `snapshot?path=/tmp/x.png[&window=main\|sheet\|settings\|key\|popover\|viewer]` | Renders a window to PNG. `sheet` is the sheet attached to the main window. `viewer` is the image viewer window. `popover` renders the main window with every open popover drawn over it at its screen position, so the profile popover can be captured without screen recording access. |
 | `state?path=/tmp/x.json` | Dumps servers, connection states, selected team and channel, unread and mention counts, visible post count, badge, open sheet and window visibility. |
 | `add-server?url=<url>[&name=<name>]` | Validates the server and adds it. The site name is used when `name` is omitted. |
 | `login?server=<index>&user=<login>&password=<password>` | Logs in to the server at the given index (default 0). |
@@ -122,13 +122,15 @@ from the newest regular post, so `index=0` is the last one.
 | `channel-files-filter?type=all\|documents\|spreadsheets\|presentations\|code\|images\|audio\|video` | Picks a file type in the pane's filter menu (`videos` is accepted too) and reloads the list. The detail is the number of loaded files. |
 | `channel-files-search[?q=<text>]` | Searches files in the pane's channel, as typing in "Search files" and pressing Return does. Without `q` the search is cleared and the recent files come back. |
 | `channel-files-more` | Loads the next page, as scrolling to the last row does. Nothing happens once the list is at its end. |
-| `channel-file?index=<n>[&action=preview\|open\|download\|copy-link]` | Acts on the n-th row (0-based) of the pane. `preview` (the default) opens images in the image preview sheet and other files in Quick Look; the detail is `image-preview` or `quick-look:<path>`. `open` jumps to the file's post ("Open in channel"), `download` saves it to Downloads, and `copy-link` copies the post permalink and returns it. |
+| `channel-file?index=<n>[&action=preview\|open\|download\|copy-link]` | Acts on the n-th row (0-based) of the pane. `preview` (the default) opens images in the image viewer window and other files in Quick Look; the detail is `image-preview` or `quick-look:<path>`. `open` jumps to the file's post ("Open in channel"), `download` saves it to Downloads, and `copy-link` copies the post permalink and returns it. |
 | `quick-look-close` | Closes the Quick Look panel. |
 | `command?name=<name>[&number=<n>]` | Runs a menu or keyboard command, listed below. |
 
 `command` names: `focus-search`, `focus-composer`, `quick-switcher`, `toggle-sidebar`, `toggle-pane`, `zoom-in`,
 `zoom-out`, `zoom-reset`, `next-server`, `previous-server`, `server` (with `number`, 1-based), `next-channel`,
 `previous-channel`, `next-unread`, `browse`, `direct-messages`, `close-sheets` and `preview-last-image`.
+`preview-last-image` opens the first image of the newest post with images in the image viewer, with the post's other
+images available through the arrow keys. `close-sheets` also closes the viewer.
 
 ### Profiles and channel members
 
@@ -183,6 +185,11 @@ server, `loading`, `loadingMore`, `atEnd`, `nextPage`, `count`, the `empty` and 
 shows, the first 40 `files` (`id`, `name`, `kind`, `size`, `date`, the `Direct Message`/`Group Message`
 `tag`, `postId` and whether a `thumbnail` image is used), `preparingPreviews` (file ids being fetched for Quick Look)
 and `quickLook`, the path shown in a visible Quick Look panel.
+
+While the image viewer is open, `sheets` contains `image-preview` and `imageViewer` describes it: `fileId`, `name`, the
+gallery `index` and `count`, the original `width` and `height`, the `zoom` percentage, whether it is `fitting` the
+window, the `quality` shown (`preview` placeholder or `full` original), the long side of the decoded bitmap in
+`decodedPixel`, `loading` and `failure`.
 
 Message read information is reported too. `readInfo` names the server-side gating (`postPriority`,
 `acknowledgements`, `persistentNotifications`, `burnOnRead` and the `licenseSku` they come from). Post summaries carry

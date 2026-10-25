@@ -56,7 +56,7 @@ extension Workspace {
     @discardableResult
     func previewChannelFile(_ file: FileInfo) async -> ChannelFilePreview? {
         if file.isImage && file.kind != .svg {
-            previewFile = file
+            previewImage(file, in: channelFiles.files)
             return .sheet
         }
         guard let url = await previewCopy(of: file) else { return nil }
