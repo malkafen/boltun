@@ -91,7 +91,7 @@ struct LeftRail: View {
         }
         .frame(width: Self.width)
         .frame(maxHeight: .infinity)
-        .background(Theme.serverRail)
+        .background(Theme.serverRail, ignoresSafeAreaEdges: [.horizontal, .bottom])
     }
 
     var currentSession: ServerSession? {

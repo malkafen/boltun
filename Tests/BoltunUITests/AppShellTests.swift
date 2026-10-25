@@ -180,6 +180,29 @@ struct AppShellTests {
         #expect(Snapshot.png(of: blank) == nil)
     }
 
+    @Test func titlebarBehindTrafficLightsMatchesTheRestOfTheTitlebar() async throws {
+        let (model, _) = Fixture.appModel()
+        await model.selectServer(at: 0)
+        let controller = MainWindowController(rootView: MainView(model: model), autosaveName: nil)
+        let window = try #require(controller.window)
+        window.setContentSize(NSSize(width: 1240, height: 820))
+        try await Task.sleep(for: .milliseconds(300))
+        let data = try #require(Snapshot.png(of: window))
+        let rep = try #require(NSBitmapImageRep(data: data))
+        let scale = CGFloat(rep.pixelsWide) / window.frame.width
+        let titlebarY = Int(4 * scale)
+        func color(_ x: CGFloat) -> NSColor? { rep.colorAt(x: Int(x * scale), y: titlebarY)?.usingColorSpace(.sRGB) }
+        let underButtons = try #require(color(LeftRail.width / 2))
+        let afterButtons = try #require(color(LeftRail.width + 40))
+        let farRight = try #require(color(900))
+        for other in [afterButtons, farRight] {
+            #expect(abs(underButtons.redComponent - other.redComponent) < 0.01)
+            #expect(abs(underButtons.greenComponent - other.greenComponent) < 0.01)
+            #expect(abs(underButtons.blueComponent - other.blueComponent) < 0.01)
+        }
+        window.close()
+    }
+
     @Test func fontScaleEnvironmentDefaults() {
         let values = EnvironmentValues()
         #expect(values.fontScale == 1.0)
