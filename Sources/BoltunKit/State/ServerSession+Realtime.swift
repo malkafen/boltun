@@ -232,8 +232,12 @@ extension ServerSession {
         }
         applyFollowers(event, post: post, mentioned: mentioned)
         if event.data["set_online"]?.boolValue == true { markActive(userId: post.userId) }
-        if channel == nil, teamId.isEmpty || loadedTeams.contains(teamId) {
-            Task { await self.refreshChannel(post.channelId) }
+        let membershipUnknown = fromOthers && members[post.channelId] == nil
+        if membershipUnknown || (channel == nil && (teamId.isEmpty || loadedTeams.contains(teamId))) {
+            Task {
+                await self.refreshChannel(post.channelId)
+                if membershipUnknown { self.notifyIfNeeded(post: post, event: event, teamId: teamId, mentioned: mentioned) }
+            }
         }
         guard fromOthers else { return }
         let channelType = channel?.type ?? ChannelType(rawValue: event.string("channel_type") ?? "") ?? .open
@@ -248,17 +252,26 @@ extension ServerSession {
             members[post.channelId] = member
         }
         if !viewing { trackQuietMention(post, teamId: teamId) }
+        guard !membershipUnknown else { return }
+        notifyIfNeeded(post: post, event: event, teamId: teamId, mentioned: mentioned)
+    }
+
+    func notifyIfNeeded(post: Post, event: WebSocketEvent, teamId: String, mentioned: Bool) {
         guard let me else { return }
+        let channel = channels[post.channelId]
+        let channelType = channel?.type ?? ChannelType(rawValue: event.string("channel_type") ?? "") ?? .open
+        let viewing = currentChannelId == post.channelId && isAppActive()
+        let member = members[post.channelId]
         let shouldNotify = NotificationPolicy.shouldNotify(
             post: post,
             channelType: channelType,
             mentioned: mentioned,
             me: me,
-            member: members[post.channelId],
+            member: member,
             myStatus: statuses[myId],
             isViewingChannel: viewing,
             isChannelWideMention: ChannelMention.isChannelWideOnly(message: post.message, user: me),
-            isTeamMuted: notificationsSuppressed(teamId: teamId, channelType: channelType),
+            isQuiet: member == nil || notificationsSuppressed(teamId: teamId, channelType: channelType),
             isThreadReply: collapsedThreads && post.isReply,
             isFollowingThread: followsThread(of: post)
         )
@@ -324,6 +337,7 @@ extension ServerSession {
             let (channel, member) = try await (channelRequest, memberRequest)
             channels[channelId] = channel
             members[channelId] = member
+            resetQuietMentions(channelId: channelId)
             if let partner = channel.directPartnerId(me: myId) { await ensureUsers([partner]) }
             let teamIds = channel.teamId.isEmpty ? Array(loadedTeams) : [channel.teamId]
             for teamId in teamIds where loadedTeams.contains(teamId) {
@@ -340,6 +354,7 @@ extension ServerSession {
         await refreshTeamUnreads()
         let remaining = Set(teams.map(\.id))
         loadedTeams = loadedTeams.intersection(remaining)
+        Task { await self.loadRemainingTeams() }
         if let teamId = currentTeamId, !remaining.contains(teamId) {
             if let first = orderedTeams.first {
                 await selectTeam(first.id)

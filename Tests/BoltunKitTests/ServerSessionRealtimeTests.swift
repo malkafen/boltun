@@ -99,13 +99,15 @@ import Testing
         #expect(session.teamUnreads["t2"]?.msgCount == 5)
         #expect(session.teamUnreads["t2"]?.mentionCount == 3)
         #expect(session.teamUnread(teamId: "t2") == ChannelUnread(unread: true, mentions: 3))
+        #expect(await eventually { box.items.count == 1 })
         let note = try #require(box.items.first)
         #expect(note.title == "Beta Square")
         #expect(note.teamId == "t2")
         session.apply(Fixtures.posted(Fixtures.post("n2", channel: "c-beta2", user: "u2", message: "new team", createAt: 1001, rootId: "n1"), team: "t9"))
         #expect(session.teamUnreads["t9"] == TeamUnread(teamId: "t9", msgCount: 1))
         await settle()
-        #expect(server.transport.count("GET", "channels/c-beta") == 0)
+        #expect(server.transport.count("GET", "channels/c-beta") == 1)
+        #expect(box.items.count == 1)
         session.stop()
     }
 
@@ -127,9 +129,11 @@ import Testing
         #expect(box.items.isEmpty)
         session.statuses["me1"] = .online
         session.members["c-dev"]?.notifyProps["mark_unread"] = "mention"
-        session.apply(Fixtures.posted(Fixtures.post("n2", channel: "c-dev", user: "u2", message: "@alice", createAt: 1001), mentions: ["me1"]))
+        session.apply(Fixtures.posted(Fixtures.post("n2", channel: "c-dev", user: "u2", message: "@channel", createAt: 1001), mentions: ["me1"]))
         #expect(box.items.isEmpty)
         #expect(session.members["c-dev"]?.mentionCount == 2)
+        session.apply(Fixtures.posted(Fixtures.post("n3", channel: "c-dev", user: "u2", message: "@alice", createAt: 1002), mentions: ["me1"]))
+        #expect(box.items.map(\.postId) == ["n3"])
         session.stop()
     }
 
