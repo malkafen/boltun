@@ -274,6 +274,7 @@ public final class DebugAutomation {
         case .sheet: found = host?.mainWindow?.attachedSheet
         case .settings: found = NSApp.windows.first { $0.identifier?.rawValue.localizedCaseInsensitiveContains("settings") == true && $0.isVisible }
         case .key: found = NSApp.keyWindow
+        case .viewer: found = ImageViewerPresenter.shared.window
         }
         guard let found else { throw AutomationError.noWindow(target.rawValue) }
         return found

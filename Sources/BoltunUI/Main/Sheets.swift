@@ -110,30 +110,3 @@ struct DirectMessageSheet: View {
         }
     }
 }
-
-struct ImagePreviewSheet: View {
-    let workspace: Workspace
-    let file: FileInfo
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        let client = workspace.session.client
-        VStack(spacing: 12) {
-            HStack {
-                Text(file.name).scaledFont(14, weight: .semibold).lineLimit(1)
-                Text(FileSizeText.text(file.size)).scaledFont(12).foregroundStyle(Theme.textSecondary)
-                Spacer()
-                Button("Download") { Task { await workspace.download(file) } }
-                    .disabled(workspace.downloading.contains(file.id))
-                Button("Close") { dismiss() }.keyboardShortcut(.cancelAction)
-            }
-            RemoteImage(url: file.hasPreviewImage ? client.filePreviewURL(id: file.id) : client.fileURL(id: file.id), client: client, maxPixel: 2000, contentMode: .fit) {
-                ProgressView()
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .padding(16)
-        .frame(minWidth: 640, idealWidth: 900, minHeight: 480, idealHeight: 700)
-        .background(Theme.content)
-    }
-}

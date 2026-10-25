@@ -205,7 +205,10 @@ struct MainSnapshotTests {
         let workspace = Fixture.workspace(transport: transport)
         await MainSnapshot.render(BrowseChannelsSheet(workspace: workspace), size: CGSize(width: 520, height: 480), name: "browse-channels", settle: .milliseconds(500))
         await MainSnapshot.render(DirectMessageSheet(workspace: workspace), size: CGSize(width: 460, height: 460), name: "direct-messages", settle: .milliseconds(500))
-        await MainSnapshot.render(ImagePreviewSheet(workspace: workspace, file: FileInfo(id: "f-img", name: "screenshot.png", size: 1000, hasPreviewImage: true)), size: CGSize(width: 800, height: 600), name: "image-preview", settle: .milliseconds(400))
+        let viewer = ImageViewerModel(workspace: workspace, file: FileInfo(id: "f-img", name: "screenshot.png", size: 1000, width: 640, height: 400, hasPreviewImage: true), gallery: [], display: .fallback)
+        viewer.start()
+        await MainSnapshot.render(ImageViewerView(model: viewer), size: CGSize(width: 800, height: 600), name: "image-preview", settle: .milliseconds(400))
+        viewer.release()
         workspace.recentEmojis = ["rocket"]
         await MainSnapshot.render(EmojiPicker(workspace: workspace) { _ in }.background(Theme.popover), size: CGSize(width: 300, height: 280), name: "emoji-picker")
         await MainSnapshot.render(EmojiPicker(workspace: workspace) { _ in }.background(Theme.popover), size: CGSize(width: 300, height: 280))

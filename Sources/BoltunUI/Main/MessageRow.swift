@@ -624,7 +624,7 @@ struct FilesView: View {
             if !images.isEmpty {
                 FlowLayout(spacing: 6) {
                     ForEach(images) { file in
-                        ImageThumbnail(file: file, client: workspace.session.client) { workspace.previewFile = file }
+                        ImageThumbnail(file: file, client: workspace.session.client) { workspace.previewImage(file, in: images) }
                     }
                 }
             }
@@ -647,14 +647,20 @@ enum ThumbnailSizing {
 }
 
 struct ImageThumbnail: View {
+    static let maxPixel: CGFloat = 700
+
     let file: FileInfo
     let client: APIClient
     let action: () -> Void
 
+    static func url(for file: FileInfo, client: APIClient) -> URL {
+        file.hasPreviewImage ? client.filePreviewURL(id: file.id) : client.fileURL(id: file.id)
+    }
+
     var body: some View {
         let size = ThumbnailSizing.size(width: file.width, height: file.height)
         Button(action: action) {
-            RemoteImage(url: file.hasPreviewImage ? client.filePreviewURL(id: file.id) : client.fileURL(id: file.id), client: client, maxPixel: 700, contentMode: .fill) {
+            RemoteImage(url: Self.url(for: file, client: client), client: client, maxPixel: Self.maxPixel, contentMode: .fill) {
                 ZStack {
                     Theme.codeBackground
                     ProgressView().controlSize(.small)

@@ -206,13 +206,17 @@ struct ChannelFileTag: View {
 }
 
 struct ChannelFileThumbnail: View {
+    static let defaultSize: CGFloat = 36
+
     let file: FileInfo
     let client: APIClient
-    var size: CGFloat = 36
+    var size: CGFloat = defaultSize
+
+    static func maxPixel(size: CGFloat) -> CGFloat { size * 3 }
 
     var body: some View {
         if let url = Self.thumbnailURL(for: file, client: client) {
-            RemoteImage(url: url, client: client, maxPixel: size * 3, contentMode: .fill) {
+            RemoteImage(url: url, client: client, maxPixel: Self.maxPixel(size: size), contentMode: .fill) {
                 ChannelFileIcon(kind: file.kind, size: size)
             }
             .frame(width: size, height: size)

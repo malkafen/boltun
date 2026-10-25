@@ -109,7 +109,8 @@ struct WorkspaceView: View {
         .background { WorkspaceShortcuts(workspace: workspace) }
         .sheet(isPresented: $workspace.showBrowseChannels) { BrowseChannelsSheet(workspace: workspace) }
         .sheet(isPresented: $workspace.showDirectMessages) { DirectMessageSheet(workspace: workspace) }
-        .sheet(item: $workspace.previewFile) { file in ImagePreviewSheet(workspace: workspace, file: file) }
+        .onChange(of: workspace.previewFile, initial: true) { ImageViewerPresenter.shared.sync(workspace) }
+        .onDisappear { ImageViewerPresenter.shared.close(for: workspace) }
         .sheet(item: $workspace.notificationPreferences) { target in
             ChannelNotificationsSheet(workspace: workspace, channelId: target.id)
         }

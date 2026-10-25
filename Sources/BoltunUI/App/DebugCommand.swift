@@ -8,6 +8,7 @@ public enum DebugCommand: Equatable, Sendable {
         case settings
         case key
         case popover
+        case viewer
     }
 
     case snapshot(path: String, window: WindowTarget)

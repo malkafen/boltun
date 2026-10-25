@@ -108,6 +108,7 @@ struct AutomationUIState: Codable, Equatable, Sendable {
     var profile: ProfileSummary?
     var members: MembersSummary?
     var channelFiles: ChannelFilesSummary?
+    var imageViewer: ImageViewerSummary?
 
     struct Editor: Codable, Equatable, Sendable {
         var spellChecking: Bool
@@ -383,11 +384,13 @@ extension DebugAutomation {
             workspace.showBrowseChannels = false
             workspace.showDirectMessages = false
             workspace.previewFile = nil
+            ImageViewerPresenter.shared.close(for: workspace)
         case "preview-last-image":
             guard let channelId = workspace.session.currentChannelId,
-                  let file = workspace.session.timelinePosts(channelId: channelId).reversed().lazy.flatMap(\.metadata.files).first(where: \.isImage)
+                  let post = workspace.session.timelinePosts(channelId: channelId).last(where: { $0.metadata.files.contains(where: \.isImage) }),
+                  let file = post.metadata.files.first(where: \.isImage)
             else { throw AutomationError.failed("no image") }
-            workspace.previewFile = file
+            workspace.previewImage(file, in: post.metadata.files)
         default:
             throw AutomationError.failed("unknown command \(name)")
         }
@@ -487,7 +490,8 @@ extension DebugAutomation {
             lastViewedAtOnOpen: timeline.lastViewedAtOnOpen,
             profile: Self.profileSummary(workspace),
             members: Self.membersSummary(workspace),
-            channelFiles: Self.channelFilesSummary(workspace, quickLook: QuickLookPanel.shared.visibleURL)
+            channelFiles: Self.channelFilesSummary(workspace, quickLook: QuickLookPanel.shared.visibleURL),
+            imageViewer: ImageViewerPresenter.shared.model(for: workspace).map(Self.imageViewerSummary)
         )
     }
 

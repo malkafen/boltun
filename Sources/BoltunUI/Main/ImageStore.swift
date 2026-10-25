@@ -2,6 +2,7 @@ import AppKit
 import BoltunKit
 import ImageIO
 import SwiftUI
+import UniformTypeIdentifiers
 
 @MainActor
 final class ImageStore {
@@ -87,6 +88,29 @@ enum ImageDecoder {
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
         return DecodedImage(image: image)
     }
+
+    static func properties(_ data: Data) -> ImageSourceProperties? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil), CGImageSourceGetCount(source) > 0,
+              let values = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        else { return nil }
+        let width = (values[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue ?? 0
+        let height = (values[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue ?? 0
+        let orientation = (values[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        let rotated = (5...8).contains(orientation)
+        return ImageSourceProperties(
+            pixelSize: rotated ? CGSize(width: height, height: width) : CGSize(width: width, height: height),
+            frameCount: CGImageSourceGetCount(source),
+            type: CGImageSourceGetType(source).map { $0 as String }
+        )
+    }
+}
+
+struct ImageSourceProperties: Equatable, Sendable {
+    let pixelSize: CGSize
+    let frameCount: Int
+    let type: String?
+
+    var isAnimatedGIF: Bool { frameCount > 1 && type == UTType.gif.identifier }
 }
 
 struct RemoteImage<Placeholder: View>: View {
