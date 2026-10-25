@@ -21,14 +21,19 @@ import Testing
         session.stop()
     }
 
-    @Test func mutedChannelCountsMentionsButNotUnread() async {
+    @Test func mutedChannelCountsPersonalMentionsButNotUnread() async {
         let server = MockServer()
         server.transport.on("GET", "users/me/teams/t1/channels/members", object: [
             Fixtures.member("c-town", user: "me1", msgCount: 5),
-            Fixtures.member("c-dev", user: "me1", msgCount: 1, mentions: 2, markUnread: "mention"),
+            Fixtures.member("c-dev", user: "me1", msgCount: 1, mentions: 3, markUnread: "mention"),
+        ])
+        server.setPosts("c-dev", [
+            Fixtures.post("m1", channel: "c-dev", user: "u2", message: "@alice one", createAt: 10),
+            Fixtures.post("m2", channel: "c-dev", user: "u3", message: "@alice two", createAt: 20),
+            Fixtures.post("m3", channel: "c-dev", user: "u2", message: "@here three", createAt: 30),
         ])
         let session = await server.startedSession()
-        #expect(session.unread(channelId: "c-dev") == ChannelUnread(unread: false, mentions: 2))
+        #expect(await eventually { session.unread(channelId: "c-dev") == ChannelUnread(unread: false, mentions: 2) })
         #expect(session.teamUnread(teamId: "t1") == ChannelUnread(unread: false, mentions: 2))
         #expect(session.unread(channelId: "c-dm") == .none)
         session.stop()

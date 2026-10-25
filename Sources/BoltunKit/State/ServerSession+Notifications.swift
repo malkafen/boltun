@@ -34,6 +34,7 @@ extension ServerSession {
         updated.notifyProps.merge(props) { _, new in new }
         guard updated != previous else { return true }
         members[channelId] = updated
+        if updated.isMuted != previous.isMuted { resetQuietMentions(channelId: channelId) }
         do {
             try await client.updateChannelNotifyProps(channelId: channelId, userId: myId, props: props)
             return true
@@ -51,7 +52,9 @@ extension ServerSession {
     }
 
     public func setMuted(teamId: String, _ muted: Bool) {
+        guard isMuted(teamId: teamId) != muted else { return }
         teamLayout.setMuted(teamId, muted, in: teams)
+        resetQuietMentions(teamId: teamId)
     }
 
     public func toggleMuted(teamId: String) {
