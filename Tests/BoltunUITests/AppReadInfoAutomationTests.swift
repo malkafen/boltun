@@ -103,6 +103,19 @@ struct AppReadInfoAutomationTests {
         #expect(sink.lines.last == "error /acknowledge no post at index 9")
     }
 
+    @Test func stateNamesWhoReacted() async throws {
+        let harness = await harness()
+        let (automation, _) = make(harness)
+        let session = try #require(harness.model.selectedSession)
+        #expect(await eventually { session.posts["ask"] != nil })
+        session.applyReaction(Reaction(userId: "me", postId: "ask", emojiName: "+1", createAt: 1), added: true)
+        session.applyReaction(Reaction(userId: "me", postId: "ask", emojiName: "tada", createAt: 2), added: true)
+        let ui = try #require(try await state(automation).ui)
+        let ask = try #require(ui.recentPosts.first { $0.id == "ask" })
+        #expect(ask.reactions == ["+1:1", "tada:1"])
+        #expect(ask.reactedBy == ["+1": ["boltun"], "tada": ["boltun"]])
+    }
+
     @Test func setsComposerPriorityAndBurnOnRead() async throws {
         let harness = await harness()
         let (automation, sink) = make(harness)

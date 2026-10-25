@@ -8,6 +8,19 @@ struct ReplyContext: Equatable, Sendable {
     var snippet: String
 }
 
+struct ReactionPerson: Equatable, Identifiable, Sendable {
+    var id: String
+    var name: String
+    var isMe: Bool
+    var avatarURL: URL?
+
+    var displayName: String { isMe ? "You" : name }
+
+    static func meFirst(_ people: [ReactionPerson]) -> [ReactionPerson] {
+        people.filter(\.isMe) + people.filter { !$0.isMe }
+    }
+}
+
 struct ReactionChipModel: Equatable, Identifiable, Sendable {
     var id: String { emojiName }
     var emojiName: String
@@ -15,7 +28,10 @@ struct ReactionChipModel: Equatable, Identifiable, Sendable {
     var customEmojiId: String?
     var count: Int
     var isMine: Bool
-    var userNames: [String]
+    var people: [ReactionPerson]
+
+    var userNames: [String] { people.map(\.displayName) }
+    var tooltip: String { ReactionTooltip.text(names: userNames, emojiName: emojiName) }
 }
 
 struct ThreadParticipant: Equatable, Identifiable, Sendable {
@@ -287,7 +303,9 @@ enum TimelineBuilder {
                 customEmojiId: context.customEmojiId(summary.emojiName),
                 count: summary.count,
                 isMine: summary.userIds.contains(context.myId),
-                userNames: summary.userIds.map(context.userName)
+                people: ReactionPerson.meFirst(summary.userIds.map { userId in
+                    ReactionPerson(id: userId, name: context.userName(userId), isMe: userId == context.myId, avatarURL: context.userAvatarURL(userId))
+                })
             )
         }
     }
