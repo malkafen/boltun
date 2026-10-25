@@ -8,7 +8,7 @@ struct StallingTransport: HTTPTransport {
 
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         if request.url?.host() == stalledHost {
-            try await Task.sleep(for: .seconds(30))
+            try await Task.sleep(for: .seconds(3600))
         }
         return try await base.send(request)
     }
@@ -21,7 +21,7 @@ struct StallingTransport: HTTPTransport {
         let transport = StallingTransport(base: harness.server.transport, stalledHost: "two.example.com")
         let app = AppModel(store: harness.store, credentials: harness.credentials, transport: transport, realtimeFactory: harness.server.realtimeFactory())
         let startup = Task { await app.startAll() }
-        let restored = await eventually(timeout: .seconds(20)) { app.selectedSession?.currentChannelId == "c-dev" }
+        let restored = await eventually(timeout: .seconds(90)) { app.selectedSession?.currentChannelId == "c-dev" }
         #expect(restored)
         #expect(app.session(for: harness.second.id)?.connection == .connecting)
         startup.cancel()

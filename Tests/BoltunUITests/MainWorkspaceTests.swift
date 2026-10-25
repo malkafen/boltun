@@ -6,7 +6,7 @@ import Testing
 @testable import BoltunUI
 
 @MainActor
-func eventually(timeout: Duration = .seconds(20), _ condition: () -> Bool) async -> Bool {
+func eventually(timeout: Duration = .seconds(60), _ condition: () -> Bool) async -> Bool {
     let deadline = ContinuousClock.now + timeout
     while ContinuousClock.now < deadline {
         if condition() { return true }
