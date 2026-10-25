@@ -313,7 +313,7 @@ extension ServerSession {
         member.urgentMentionCount = 0
         member.lastViewedAt = max(member.lastViewedAt, channel.lastPostAt)
         members[channelId] = member
-        quietMentions[channelId] = nil
+        clearQuietMentions(channelId: channelId)
     }
 
     func refreshChannel(_ channelId: String) async {

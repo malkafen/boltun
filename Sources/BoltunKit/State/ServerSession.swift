@@ -450,10 +450,10 @@ public final class ServerSession {
         }
         for channel in teamChannels {
             channels[channel.id] = channel
-            quietMentions[channel.id] = nil
+            clearQuietMentions(channelId: channel.id)
         }
         for member in teamMembers { members[member.channelId] = member }
-        Task { await self.refreshQuietMentions() }
+        if members.keys.contains(where: { isQuiet(channelId: $0) }) { Task { await self.refreshQuietMentions() } }
         categories[teamId] = teamCategories.sorted
         loadedTeams.insert(teamId)
         var needed: Set<String> = myId.isEmpty ? [] : [myId]
