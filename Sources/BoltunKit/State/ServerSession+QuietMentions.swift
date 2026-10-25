@@ -38,13 +38,18 @@ extension ServerSession {
         quietMentions[channelId] = list.posts.values.filter { $0.createAt > since && isPersonalMention($0) }.count
     }
 
+    func clearQuietMentions(channelId: String) {
+        if quietMentions[channelId] != nil { quietMentions[channelId] = nil }
+    }
+
     func resetQuietMentions(channelId: String) {
-        quietMentions[channelId] = nil
+        clearQuietMentions(channelId: channelId)
+        guard isQuiet(channelId: channelId), (members[channelId]?.mentionCount ?? 0) > 0 else { return }
         Task { await self.refreshQuietMentions(channelId: channelId) }
     }
 
     func resetQuietMentions(teamId: String) {
-        for (id, channel) in channels where channel.teamId == teamId { quietMentions[id] = nil }
+        for (id, channel) in channels where channel.teamId == teamId { clearQuietMentions(channelId: id) }
         Task {
             await self.loadQuietTeams()
             await self.refreshQuietMentions()
