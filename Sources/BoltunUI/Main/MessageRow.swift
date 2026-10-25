@@ -497,44 +497,6 @@ struct ReplyIndicator: View {
     }
 }
 
-struct ReactionChip: View {
-    let reaction: ReactionChipModel
-    let client: APIClient?
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                EmojiGlyphView(name: reaction.emojiName, glyph: reaction.glyph, customEmojiId: reaction.customEmojiId, client: client, size: 14)
-                Text("\(reaction.count)")
-                    .scaledFont(11.5, weight: .semibold)
-                    .monospacedDigit()
-                    .foregroundStyle(reaction.isMine ? Theme.link : Theme.textSecondary)
-            }
-            .padding(.horizontal, 7)
-            .frame(minHeight: 22)
-            .background(Capsule().fill(reaction.isMine ? Theme.reactionMine : Theme.reactionBackground))
-            .overlay(Capsule().strokeBorder(reaction.isMine ? Theme.reactionMineBorder : Color.clear))
-        }
-        .buttonStyle(.plain)
-        .pointerStyle(.link)
-        .help(ReactionTooltip.text(names: reaction.userNames, emojiName: reaction.emojiName))
-    }
-}
-
-enum ReactionTooltip {
-    static func text(names: [String], emojiName: String) -> String {
-        let list: String
-        switch names.count {
-        case 0: list = "Nobody"
-        case 1: list = names[0]
-        case 2...5: list = names.dropLast().joined(separator: ", ") + " and " + names.last!
-        default: list = names.prefix(5).joined(separator: ", ") + " and \(names.count - 5) others"
-        }
-        return "\(list) reacted with :\(emojiName):"
-    }
-}
-
 struct EmojiGlyphView: View {
     let name: String
     let glyph: String?

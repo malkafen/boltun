@@ -146,7 +146,7 @@ from the newest regular post, so `index=0` is the last one.
 
 `state` lists teams in sidebar order with `favoriteTeams` and `mutedTeams`, and also writes a `ui` object for the selected workspace. It includes the window title, first responder, open right
 pane and thread posts, quick switcher and search results, the highlighted post, the scroll report (distances from
-the top and bottom, content and container height, older-page requests and the unread positioning described below), timeline size and paging flags, the last posts with reactions and files, both composers (text, editing post,
+the top and bottom, content and container height, older-page requests and the unread positioning described below), timeline size and paging flags, the last posts with reactions (and `reactedBy`, the display names per emoji) and files, both composers (text, editing post,
 suggestions, uploads, height), typing users, unread and mention channels, favorites, `mutedChannels`, collapsed categories, open sheets,
 the last session error, the workspace and cached post counts, `editors`, the spell-checking and font size of every
 live composer text view, `collapsedThreads`, `myStatus` and `threadFollowing` for the open thread. Post summaries carry

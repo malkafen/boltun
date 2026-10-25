@@ -186,6 +186,21 @@ final class NotificationBox {
         session.stop()
     }
 
+    @Test func reactionFromUnknownUserLoadsTheirProfile() async {
+        let server = MockServer()
+        server.users([Fixtures.user("u9", "dave", first: "Dave")])
+        let session = await server.startedSession()
+        #expect(session.users["u9"] == nil)
+        session.apply(Fixtures.wsEvent("reaction_added", data: ["reaction": Fixtures.json(Fixtures.reaction(user: "u9", post: "p5", emoji: "tada"))], channel: "c-town"))
+        #expect(await eventually { session.users["u9"]?.username == "dave" })
+        let lookups = server.transport.count("POST", "users/ids")
+        session.apply(Fixtures.wsEvent("reaction_removed", data: ["reaction": Fixtures.json(Fixtures.reaction(user: "u9", post: "p5", emoji: "tada"))], channel: "c-town"))
+        session.apply(Fixtures.wsEvent("reaction_added", data: ["reaction": Fixtures.json(Fixtures.reaction(user: "u9", post: "p5", emoji: "+1"))], channel: "c-town"))
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(server.transport.count("POST", "users/ids") == lookups)
+        session.stop()
+    }
+
     @Test func viewedEventsClearUnread() async {
         let server = MockServer()
         let session = await server.startedSession()

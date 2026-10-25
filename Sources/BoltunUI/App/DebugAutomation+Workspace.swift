@@ -17,6 +17,7 @@ struct AutomationUIState: Codable, Equatable, Sendable {
         var message: String
         var rootId: String
         var reactions: [String]
+        var reactedBy: [String: [String]] = [:]
         var files: Int
         var edited: Bool
         var replyCount: Int = 0
@@ -542,6 +543,7 @@ extension DebugAutomation {
             message: post.isDeleted ? "(deleted)" : String(post.message.prefix(80)),
             rootId: post.rootId,
             reactions: post.reactionSummary.map { "\($0.emojiName):\($0.count)" },
+            reactedBy: Dictionary(post.reactionSummary.map { ($0.emojiName, $0.userIds.map(session.displayName(userId:))) }, uniquingKeysWith: { first, _ in first }),
             files: post.metadata.files.count,
             edited: post.isEdited,
             replyCount: post.replyCount,

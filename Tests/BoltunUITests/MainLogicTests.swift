@@ -124,7 +124,10 @@ import Testing
         #expect(reactions.first?.isMine == true)
         #expect(reactions.first?.count == 2)
         #expect(reactions.first?.glyph == "👍")
-        #expect(reactions.first?.userNames == ["Me", "Bob"])
+        #expect(reactions.first?.userNames == ["You", "Bob"])
+        #expect(reactions.first?.people.map(\.id) == ["me", "bob"])
+        #expect(reactions.first?.tooltip == "You and Bob reacted with :+1:")
+        #expect(reactions.last?.people == [ReactionPerson(id: "carol", name: "Carol", isMe: false)])
         let newIndex = items.firstIndex(of: .newMessages)!
         #expect(items[newIndex + 1].id == "p6")
     }

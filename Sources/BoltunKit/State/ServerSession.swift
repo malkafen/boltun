@@ -1077,6 +1077,10 @@ public final class ServerSession {
         post.metadata.reactions.removeAll { $0.userId == reaction.userId && $0.emojiName == reaction.emojiName }
         if added { post.metadata.reactions.append(reaction) }
         posts[reaction.postId] = post
+        if added, users[reaction.userId] == nil {
+            let userId = reaction.userId
+            Task { await self.ensureUsers([userId]) }
+        }
     }
 
     func applyPreferences(_ list: [Preference]) {
