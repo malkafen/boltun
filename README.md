@@ -4,6 +4,12 @@ A fast, native macOS client for [Mattermost](https://mattermost.com), built with
 It is a lightweight replacement for the Electron-based [Mattermost Desktop](https://github.com/mattermost/desktop):
 no bundled browser, no web view, just the Mattermost REST API and WebSocket.
 
+<img src="docs/screenshots/main.png" alt="Boltun main window: server and team sidebars, channel list with unread badges, and a channel with markdown, reactions, a thread summary and a highlighted mention" width="860">
+
+| Threads in the right pane | Full-resolution image viewer |
+|:--:|:--:|
+| <img src="docs/screenshots/thread.png" alt="A reply thread open next to the channel, with a markdown table and a Swift code block" width="420"> | <img src="docs/screenshots/image-viewer.png" alt="An image opened in the zoomable viewer window with zoom, copy, open and download controls" width="420"> |
+
 ## Benchmark: Boltun vs Mattermost Desktop
 
 Both apps sign in to the same three servers and go through the same scripted steps: launch, idle, 35 channel, team
