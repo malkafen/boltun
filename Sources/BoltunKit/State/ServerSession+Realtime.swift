@@ -101,7 +101,10 @@ extension ServerSession {
             }
         case WebSocketEventType.channelMemberUpdated:
             if let member = event.embedded(ChannelMember.self, "channelMember") {
-                if member.userId == myId { members[member.channelId] = member }
+                if member.userId == myId {
+                    members[member.channelId] = member
+                    resetQuietMentions(channelId: member.channelId)
+                }
                 applyRosterChange(member)
             }
         case WebSocketEventType.userAdded:
@@ -244,6 +247,7 @@ extension ServerSession {
             if post.rootId.isEmpty { member.mentionCountRoot += 1 }
             members[post.channelId] = member
         }
+        if !viewing { trackQuietMention(post, teamId: teamId) }
         guard let me else { return }
         let shouldNotify = NotificationPolicy.shouldNotify(
             post: post,
@@ -285,6 +289,7 @@ extension ServerSession {
         member.urgentMentionCount = event.data["urgent_mention_count"]?.intValue ?? member.urgentMentionCount
         member.lastViewedAt = event.data["last_viewed_at"]?.doubleValue.map { Int64(clamping: $0) } ?? member.lastViewedAt
         members[channelId] = member
+        resetQuietMentions(channelId: channelId)
     }
 
     func viewedElsewhere(_ channelIds: [String]) {
@@ -308,6 +313,7 @@ extension ServerSession {
         member.urgentMentionCount = 0
         member.lastViewedAt = max(member.lastViewedAt, channel.lastPostAt)
         members[channelId] = member
+        quietMentions[channelId] = nil
     }
 
     func refreshChannel(_ channelId: String) async {

@@ -72,6 +72,7 @@ public final class ServerSession {
     public internal(set) var channelRoster: [String: [String: ChannelMember]] = [:]
     public internal(set) var teamRoster: [String: [String: TeamMember]] = [:]
     public internal(set) var lastActivity: [String: Int64] = [:]
+    public internal(set) var quietMentions: [String: Int] = [:]
     public var teamLayout = TeamLayout() {
         didSet { if teamLayout != oldValue { onTeamLayoutChange?(teamLayout) } }
     }
@@ -99,6 +100,7 @@ public final class ServerSession {
     @ObservationIgnored var requestedStatusIds = Set<String>()
     @ObservationIgnored var refreshedProfileIds = Set<String>()
     @ObservationIgnored var requestedMemberships = Set<String>()
+    @ObservationIgnored var quietMentionRequests = Set<String>()
     @ObservationIgnored let realtimeFactory: (URL, String) -> RealtimeClient
     @ObservationIgnored var realtime: RealtimeClient?
     @ObservationIgnored var realtimeTask: Task<Void, Never>?
@@ -178,27 +180,27 @@ public final class ServerSession {
 
     public func unread(channelId: String) -> ChannelUnread {
         guard let channel = channels[channelId] else { return .none }
-        return SidebarBuilder.unread(channel: channel, member: members[channelId], collapsedThreads: collapsedThreads)
+        return quietUnread(channelId: channelId, base: SidebarBuilder.unread(channel: channel, member: members[channelId], collapsedThreads: collapsedThreads))
     }
 
     public func teamUnread(teamId: String) -> ChannelUnread {
         if loadedTeams.contains(teamId) {
             var result = ChannelUnread()
             for (id, channel) in channels where channel.teamId == teamId {
-                let unread = SidebarBuilder.unread(channel: channel, member: members[id], collapsedThreads: collapsedThreads)
+                let unread = unread(channelId: id)
                 result.unread = result.unread || unread.unread
                 result.mentions += unread.mentions
             }
             return result
         }
-        guard let value = teamUnreads[teamId] else { return .none }
+        guard !isMuted(teamId: teamId), let value = teamUnreads[teamId] else { return .none }
         return ChannelUnread(unread: (collapsedThreads ? value.msgCountRoot : value.msgCount) > 0, mentions: value.mentionCount)
     }
 
     public var directUnread: ChannelUnread {
         var result = ChannelUnread()
         for (id, channel) in channels where channel.type.isDirectOrGroup {
-            let unread = SidebarBuilder.unread(channel: channel, member: members[id], collapsedThreads: collapsedThreads)
+            let unread = unread(channelId: id)
             result.unread = result.unread || unread.unread
             result.mentions += unread.mentions
         }
@@ -402,6 +404,7 @@ public final class ServerSession {
             await loadLatest(channelId: channelId)
         }
         Task { await self.loadCustomEmojis() }
+        Task { await self.loadQuietTeams() }
     }
 
     public func selectTeam(_ teamId: String, channelId: String? = nil) async {
@@ -445,8 +448,12 @@ public final class ServerSession {
         for (id, channel) in channels where !returned.contains(id) && (channel.teamId == teamId || channel.type.isDirectOrGroup) {
             members[id] = nil
         }
-        for channel in teamChannels { channels[channel.id] = channel }
+        for channel in teamChannels {
+            channels[channel.id] = channel
+            quietMentions[channel.id] = nil
+        }
         for member in teamMembers { members[member.channelId] = member }
+        Task { await self.refreshQuietMentions() }
         categories[teamId] = teamCategories.sorted
         loadedTeams.insert(teamId)
         var needed: Set<String> = myId.isEmpty ? [] : [myId]
@@ -517,6 +524,7 @@ public final class ServerSession {
                 member.lastViewedAt = unread.lastViewedAt
                 members[post.channelId] = member
             }
+            resetQuietMentions(channelId: post.channelId)
             timelines[post.channelId]?.lastViewedAtOnOpen = unread.lastViewedAt
         } catch {
             report(error)
