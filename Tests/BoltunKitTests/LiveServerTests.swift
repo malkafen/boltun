@@ -296,4 +296,39 @@ struct LiveServerTests {
         #expect(session.lastError == nil)
         session.stop()
     }
+
+    @MainActor
+    @Test(arguments: Live.servers)
+    func mutedChannelInBackgroundTeamNotifiesOnlyWhenTagged(base: String) async throws {
+        let (client, user) = try await Live.login(base)
+        let (admin, _) = try await Live.login(base, user: Live.admin, password: Live.adminPassword)
+        let teams = ServerSession.sortedTeams(try await client.myTeams())
+        try #require(teams.count >= 2)
+        let background = teams[1]
+        let channel = try await admin.send(Channel.self, .get, "teams/\(background.id)/channels/name/town-square")
+        try await client.updateChannelNotifyProps(channelId: channel.id, userId: user.id, props: ChannelNotifySettings.muteProps(true))
+        let session = ServerSession(serverId: UUID(), client: client, realtimeFactory: { url, token in
+            RealtimeClient(url: url, token: token, connector: Live.connector, maxBackoff: .seconds(2))
+        })
+        let box = NotificationBox()
+        session.onNotification = { box.items.append($0) }
+        session.isAppActive = { false }
+        await session.start()
+        await session.selectTeam(teams[0].id)
+        #expect(await eventually(timeout: .seconds(15)) { session.isMuted(channelId: channel.id) })
+        await session.markViewed(channelId: channel.id)
+        try await Task.sleep(for: .seconds(1))
+        let marker = Live.marker()
+        let wide = try await admin.createPost(channelId: channel.id, message: "@channel \(marker) wide")
+        let plain = try await admin.createPost(channelId: channel.id, message: "\(marker) plain")
+        let tagged = try await admin.createPost(channelId: channel.id, message: "@\(user.username) \(marker) tagged")
+        #expect(await eventually(timeout: .seconds(15)) { box.items.contains { $0.postId == tagged.id } })
+        try await Task.sleep(for: .seconds(1))
+        #expect(box.items.map(\.postId) == [tagged.id])
+        #expect(session.unread(channelId: channel.id) == ChannelUnread(unread: false, mentions: 1))
+        await session.markViewed(channelId: channel.id)
+        session.stop()
+        for post in [wide, plain, tagged] { try await admin.deletePost(id: post.id) }
+        try await client.updateChannelNotifyProps(channelId: channel.id, userId: user.id, props: ChannelNotifySettings.muteProps(false))
+    }
 }

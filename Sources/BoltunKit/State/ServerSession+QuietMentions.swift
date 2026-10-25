@@ -35,7 +35,8 @@ extension ServerSession {
         let since = member.lastViewedAt
         guard let list = await quietly({ try await client.posts(channelId: channelId, page: .since(since)) }) else { return }
         guard members[channelId]?.lastViewedAt == since else { return }
-        quietMentions[channelId] = list.posts.values.filter { $0.createAt > since && isPersonalMention($0) }.count
+        let received = posts.values.filter { $0.channelId == channelId }
+        quietMentions[channelId] = Set((Array(list.posts.values) + received).filter { $0.createAt > since && isPersonalMention($0) }.map(\.id)).count
     }
 
     func clearQuietMentions(channelId: String) {

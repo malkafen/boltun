@@ -104,6 +104,21 @@ import Testing
         session.stop()
     }
 
+    @Test func mentionArrivingDuringRecountIsKept() async {
+        let server = server(mutedChannels: ["c-dev"])
+        let gate = Gate()
+        server.holdPosts("c-dev", gate: gate)
+        let session = await server.startedSession(team: nil)
+        await session.selectTeam("t1", channelId: "c-town")
+        #expect(await eventually { server.transport.count("GET", "channels/c-dev/posts") >= 1 })
+        session.apply(Fixtures.posted(post("live", message: "@alice are you there?"), mentions: ["me1"]))
+        #expect(session.quietMentions["c-dev"] == 1)
+        await gate.open()
+        #expect(await eventually { session.quietMentions["c-dev"] == 2 })
+        #expect(session.unread(channelId: "c-dev").mentions == 2)
+        session.stop()
+    }
+
     @Test func preloadedTeamsBadgeMutedChannelsOnlyForPersonalMentions() async {
         let server = server()
         server.transport.on("GET", "users/me/teams/t2/channels/members", object: [
