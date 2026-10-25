@@ -15,6 +15,7 @@ struct ProfileAnchor: Hashable, Sendable {
         case name
         case mention
         case member
+        case reaction
     }
 
     var surface: Surface
