@@ -104,6 +104,66 @@ import Testing
         session.stop()
     }
 
+    @Test func mentionArrivingDuringRecountIsKept() async {
+        let server = server(mutedChannels: ["c-dev"])
+        let gate = Gate()
+        server.holdPosts("c-dev", gate: gate)
+        let session = await server.startedSession(team: nil)
+        await session.selectTeam("t1", channelId: "c-town")
+        #expect(await eventually { server.transport.count("GET", "channels/c-dev/posts") >= 1 })
+        session.apply(Fixtures.posted(post("live", message: "@alice are you there?"), mentions: ["me1"]))
+        #expect(session.quietMentions["c-dev"] == 1)
+        await gate.open()
+        #expect(await eventually { session.quietMentions["c-dev"] == 2 })
+        #expect(session.unread(channelId: "c-dev").mentions == 2)
+        session.stop()
+    }
+
+    @Test func preloadedTeamsBadgeMutedChannelsOnlyForPersonalMentions() async {
+        let server = server()
+        server.transport.on("GET", "users/me/teams/t2/channels/members", object: [
+            Fixtures.member("c-beta", user: "me1", msgCount: 0, mentions: 2, lastViewedAt: 5, markUnread: "mention"),
+        ])
+        server.setPosts("c-beta", [
+            Fixtures.post("b1", channel: "c-beta", user: "u2", message: "@alice the build is yours", createAt: 10),
+            Fixtures.post("b2", channel: "c-beta", user: "u2", message: "@all heads up", createAt: 20),
+        ])
+        let session = await server.startedSession(preloadsTeams: true)
+        #expect(await eventually { session.quietMentions["c-beta"] == 1 })
+        #expect(session.teamUnread(teamId: "t2") == ChannelUnread(unread: false, mentions: 1))
+        #expect(server.transport.count("GET", "users/me/teams/t2/channels") == 1)
+        #expect(server.transport.count("GET", "users/me/teams/t1/channels") == 1)
+        session.apply(Fixtures.posted(post("n1", channel: "c-beta", message: "@here standup"), team: "t2", mentions: ["me1"]))
+        #expect(session.teamUnread(teamId: "t2").mentions == 1)
+        session.apply(Fixtures.posted(post("n2", channel: "c-beta", message: "@alice ping", at: 1001), team: "t2", mentions: ["me1"]))
+        #expect(session.teamUnread(teamId: "t2").mentions == 2)
+        session.stop()
+    }
+
+    @Test func failedPreloadFallsBackToServerCountsWithoutRetrying() async {
+        let server = server()
+        server.transport.on("GET", "users/me/teams/t2/channels", .error(500))
+        let session = await server.startedSession(preloadsTeams: true)
+        #expect(await eventually { server.transport.count("GET", "users/me/teams/t2/channels") == 1 })
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(server.transport.count("GET", "users/me/teams/t2/channels") == 1)
+        #expect(session.teamUnread(teamId: "t2") == ChannelUnread(unread: true, mentions: 2))
+        #expect(session.lastError == nil)
+        session.stop()
+    }
+
+    @Test func newTeamsArePreloaded() async {
+        let server = server()
+        server.transport.on("GET", "users/me/teams", object: [Fixtures.team("t1", "alpha", display: "Alpha")])
+        let session = await server.startedSession(preloadsTeams: true)
+        #expect(server.transport.count("GET", "users/me/teams/t2/channels") == 0)
+        server.transport.on("GET", "users/me/teams", object: [Fixtures.team("t1", "alpha", display: "Alpha"), Fixtures.team("t2", "beta", display: "beta")])
+        session.apply(Fixtures.wsEvent("added_to_team", data: ["team_id": "t2", "user_id": "me1"], user: "me1"))
+        #expect(await eventually { server.transport.count("GET", "users/me/teams/t2/channels") == 1 })
+        #expect(await eventually { session.members["c-beta"] != nil })
+        session.stop()
+    }
+
     @Test func mutedDirectMessageCountsOnlyWhenTagged() async {
         let server = server(mutedChannels: ["c-dm"])
         let session = await server.startedSession()

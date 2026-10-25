@@ -30,17 +30,17 @@ public enum NotificationPolicy {
         myStatus: UserStatusValue?,
         isViewingChannel: Bool,
         isChannelWideMention: Bool = false,
-        isTeamMuted: Bool = false,
+        isQuiet: Bool = false,
         isThreadReply: Bool = false,
         isFollowingThread: Bool = true
     ) -> Bool {
         guard post.userId != me.id, !post.isSystemMessage, !post.isDeleted else { return false }
         guard post.props["from_webhook"]?.boolValue != true || mentioned || channelType.isDirectOrGroup else { return false }
-        if myStatus == .dnd || isViewingChannel || isTeamMuted { return false }
+        if myStatus == .dnd || isViewingChannel { return false }
         let settings = ChannelNotifySettings(member: member, user: me)
-        guard !settings.muted else { return false }
         let level = settings.desktopLevel(user: me)
         guard level != .none else { return false }
+        if settings.muted || isQuiet { return ChannelMention.mentionsUser(post.message, user: me) }
         let counts = mentioned && !(isChannelWideMention && settings.ignoresChannelMentions(user: me))
         if isThreadReply {
             guard isFollowingThread else { return false }

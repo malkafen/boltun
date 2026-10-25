@@ -167,6 +167,7 @@ import Testing
         #expect(notify(post(), member: all))
         #expect(!notify(post(), type: .direct, member: none))
         #expect(!notify(post(), mentioned: true, member: muted))
+        #expect(!notify(post(), type: .direct, member: muted))
         let userAll = User(id: "me", username: "me", notifyProps: ["desktop": "all"])
         #expect(notify(post(), me: userAll, member: ChannelMember(channelId: "c", userId: "me", notifyProps: ["desktop": "default"])))
         #expect(!notify(post(), me: User(id: "me", username: "me", notifyProps: ["desktop": "none"]), member: nil))

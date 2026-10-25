@@ -52,9 +52,9 @@ final class FakeTransport: HTTPTransport, @unchecked Sendable {
     static let me = #"{"id":"me","username":"boltun","notify_props":{"desktop":"mention"}}"#
     static let teams = #"[{"id":"t1","name":"team-one","display_name":"Team One"},{"id":"t2","name":"team-two","display_name":"Team Two"}]"#
     static let channelsT1 = #"[{"id":"c1","team_id":"t1","name":"town-square","display_name":"Town Square","type":"O","total_msg_count":3,"last_post_at":30},{"id":"c2","team_id":"t1","name":"off-topic","display_name":"Off-Topic","type":"O","total_msg_count":1,"last_post_at":10}]"#
-    static let channelsT2 = #"[{"id":"c3","team_id":"t2","name":"town-square","display_name":"Town Square","type":"O"},{"id":"c4","team_id":"t2","name":"random","display_name":"Random","type":"O"}]"#
+    static let channelsT2 = #"[{"id":"c3","team_id":"t2","name":"town-square","display_name":"Town Square","type":"O"},{"id":"c4","team_id":"t2","name":"random","display_name":"Random","type":"O","total_msg_count":4}]"#
     static let membersT1 = #"[{"channel_id":"c1","user_id":"me","msg_count":1,"mention_count":2},{"channel_id":"c2","user_id":"me","msg_count":1}]"#
-    static let membersT2 = #"[{"channel_id":"c3","user_id":"me"},{"channel_id":"c4","user_id":"me"}]"#
+    static let membersT2 = #"[{"channel_id":"c3","user_id":"me"},{"channel_id":"c4","user_id":"me","mention_count":1}]"#
     static let posts = #"{"order":["p2","p1"],"posts":{"p1":{"id":"p1","channel_id":"c1","user_id":"me","message":"hello","create_at":10},"p2":{"id":"p2","channel_id":"c1","user_id":"me","message":"world","create_at":20}}}"#
     static let emptyPosts = #"{"order":[],"posts":{}}"#
 

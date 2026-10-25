@@ -216,7 +216,8 @@ struct AppHarness {
         #expect(app.hasUnread)
         #expect(app.badgeLabel == "6")
         let other = try #require(app.session(for: harness.second.id))
-        other.teamUnreads["t1"] = TeamUnread(teamId: "t1", msgCount: 1, mentionCount: 200)
+        #expect(await eventually { other.members["c-beta"] != nil })
+        other.members["c-beta"]?.mentionCount = 200
         #expect(app.badgeLabel == "99+")
         for session in app.sessions.values {
             session.teamUnreads = [:]

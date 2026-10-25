@@ -35,7 +35,8 @@ extension ServerSession {
         let since = member.lastViewedAt
         guard let list = await quietly({ try await client.posts(channelId: channelId, page: .since(since)) }) else { return }
         guard members[channelId]?.lastViewedAt == since else { return }
-        quietMentions[channelId] = list.posts.values.filter { $0.createAt > since && isPersonalMention($0) }.count
+        let received = posts.values.filter { $0.channelId == channelId }
+        quietMentions[channelId] = Set((Array(list.posts.values) + received).filter { $0.createAt > since && isPersonalMention($0) }.map(\.id)).count
     }
 
     func clearQuietMentions(channelId: String) {
@@ -51,19 +52,25 @@ extension ServerSession {
     func resetQuietMentions(teamId: String) {
         for (id, channel) in channels where channel.teamId == teamId { clearQuietMentions(channelId: id) }
         Task {
-            await self.loadQuietTeams()
+            await self.loadRemainingTeams()
             await self.refreshQuietMentions()
         }
     }
 
-    func loadQuietTeams() async {
-        let targets = teams.filter { team in
-            isMuted(teamId: team.id) && !loadedTeams.contains(team.id) && (teamUnreads[team.id]?.mentionCount ?? 0) > 0
-        }
-        for team in targets {
+    func shouldPreload(teamId: String) -> Bool {
+        preloadsTeams || (isMuted(teamId: teamId) && (teamUnreads[teamId]?.mentionCount ?? 0) > 0)
+    }
+
+    func loadRemainingTeams() async {
+        guard !loadingRemainingTeams else { return }
+        loadingRemainingTeams = true
+        defer { loadingRemainingTeams = false }
+        var failed = Set<String>()
+        while let team = teams.first(where: { !loadedTeams.contains($0.id) && !failed.contains($0.id) && shouldPreload(teamId: $0.id) }) {
             do {
                 try await loadTeam(team.id)
             } catch {
+                failed.insert(team.id)
                 report(error, silently: true)
             }
         }
@@ -72,8 +79,8 @@ extension ServerSession {
     func trackQuietMention(_ post: Post, teamId: String) {
         guard isPersonalMention(post) else { return }
         guard members[post.channelId] != nil else {
-            if !teamId.isEmpty, isMuted(teamId: teamId), !loadedTeams.contains(teamId) {
-                Task { await self.loadQuietTeams() }
+            if !teamId.isEmpty, !loadedTeams.contains(teamId) {
+                Task { await self.loadRemainingTeams() }
             }
             return
         }

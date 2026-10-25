@@ -188,14 +188,16 @@ final class MockServer: @unchecked Sendable {
     }
 
     @MainActor
-    func session(token: String? = "token-1", pageSize: Int = 3) -> ServerSession {
+    func session(token: String? = "token-1", pageSize: Int = 3, preloadsTeams: Bool = false) -> ServerSession {
         let client = APIClient(baseURL: Self.baseURL, token: token, transport: transport)
-        return ServerSession(serverId: UUID(), client: client, pageSize: pageSize, realtimeFactory: realtimeFactory())
+        let session = ServerSession(serverId: UUID(), client: client, pageSize: pageSize, realtimeFactory: realtimeFactory())
+        session.preloadsTeams = preloadsTeams
+        return session
     }
 
     @MainActor
-    func startedSession(pageSize: Int = 3, team: String? = "t1") async -> ServerSession {
-        let session = session(pageSize: pageSize)
+    func startedSession(pageSize: Int = 3, team: String? = "t1", preloadsTeams: Bool = false) async -> ServerSession {
+        let session = session(pageSize: pageSize, preloadsTeams: preloadsTeams)
         await session.start()
         if let team { await session.selectTeam(team) }
         return session

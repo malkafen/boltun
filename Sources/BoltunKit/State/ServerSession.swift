@@ -107,7 +107,9 @@ public final class ServerSession {
     @ObservationIgnored var pendingUserIds = Set<String>()
     @ObservationIgnored var requestedUserIds = Set<String>()
     @ObservationIgnored var lastTypingSent: [String: Date] = [:]
-    @ObservationIgnored var loadedTeams = Set<String>()
+    var loadedTeams = Set<String>()
+    @ObservationIgnored var loadingRemainingTeams = false
+    @ObservationIgnored var teamLoads: [String: Task<Void, Error>] = [:]
     @ObservationIgnored var lastPendingMillis: Int64 = 0
     @ObservationIgnored var deletedPostIds = Set<String>()
     @ObservationIgnored var manuallyUnread = Set<String>()
@@ -116,6 +118,7 @@ public final class ServerSession {
     @ObservationIgnored var categoryRevisions: [String: Int] = [:]
     @ObservationIgnored let pageSize: Int
     @ObservationIgnored public var unreadPageLimit = 10
+    @ObservationIgnored public var preloadsTeams = true
 
     public init(
         serverId: UUID,
@@ -404,7 +407,7 @@ public final class ServerSession {
             await loadLatest(channelId: channelId)
         }
         Task { await self.loadCustomEmojis() }
-        Task { await self.loadQuietTeams() }
+        Task { await self.loadRemainingTeams() }
     }
 
     public func selectTeam(_ teamId: String, channelId: String? = nil) async {
@@ -440,6 +443,14 @@ public final class ServerSession {
     }
 
     func loadTeam(_ teamId: String) async throws {
+        if let running = teamLoads[teamId] { return try await running.value }
+        let task = Task { try await self.fetchTeam(teamId) }
+        teamLoads[teamId] = task
+        defer { teamLoads[teamId] = nil }
+        try await task.value
+    }
+
+    func fetchTeam(_ teamId: String) async throws {
         async let channelsRequest = client.myChannels(teamId: teamId)
         async let membersRequest = client.myChannelMembers(teamId: teamId)
         async let categoriesRequest = client.myCategories(teamId: teamId)
