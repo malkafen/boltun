@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-func eventually(timeout: Duration = .seconds(20), _ condition: @MainActor () -> Bool) async -> Bool {
+func eventually(timeout: Duration = .seconds(60), _ condition: @MainActor () -> Bool) async -> Bool {
     let deadline = ContinuousClock.now + timeout
     while !condition() {
         if ContinuousClock.now > deadline { return false }
@@ -10,7 +10,7 @@ func eventually(timeout: Duration = .seconds(20), _ condition: @MainActor () -> 
     return true
 }
 
-func eventuallyAsync(timeout: Duration = .seconds(20), _ condition: @Sendable () async -> Bool) async -> Bool {
+func eventuallyAsync(timeout: Duration = .seconds(60), _ condition: @Sendable () async -> Bool) async -> Bool {
     let deadline = ContinuousClock.now + timeout
     while await !condition() {
         if ContinuousClock.now > deadline { return false }

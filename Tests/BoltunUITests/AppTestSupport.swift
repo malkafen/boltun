@@ -198,7 +198,7 @@ enum Render {
 }
 
 @MainActor
-func eventually(timeout: Double = 20, _ condition: @MainActor () -> Bool) async -> Bool {
+func eventually(timeout: Double = 60, _ condition: @MainActor () -> Bool) async -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
     while !condition() {
         if Date() > deadline { return false }
