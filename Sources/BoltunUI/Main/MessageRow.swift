@@ -83,6 +83,8 @@ struct MessageRow: View, Equatable {
     var highlighted = false
     @State private var hovering: Bool
     @State private var pickerShown = false
+    @State private var allReactionsShown = false
+    @State private var allReactionsTab = ReactionTab.all
     @Environment(\.fontScale) private var fontScale
 
     init(model: MessageRowModel, workspace: Workspace, inThread: Bool = false, highlighted: Bool = false, hovering: Bool = false) {
@@ -259,7 +261,12 @@ struct MessageRow: View, Equatable {
     var reactions: some View {
         FlowLayout(spacing: 4) {
             ForEach(model.reactions) { reaction in
-                ReactionChip(reaction: reaction, client: workspace.session.client) {
+                ReactionChip(
+                    reaction: reaction,
+                    client: workspace.session.client,
+                    onSelectPerson: showReactorProfile,
+                    onViewAll: { showAllReactions(.emoji(reaction.emojiName)) }
+                ) {
                     Task { await workspace.toggleReaction(postId: post.id, emojiName: reaction.emojiName) }
                 }
             }
@@ -273,7 +280,24 @@ struct MessageRow: View, Equatable {
             .buttonStyle(.plain)
             .help("Add reaction")
         }
+        .background { MentionPopoverAnchor(workspace: workspace, anchor: reactionProfileAnchor) }
+        .popover(isPresented: $allReactionsShown, arrowEdge: .top) {
+            AllReactionsView(reactions: model.reactions, client: workspace.session.client, selection: allReactionsTab)
+        }
         .padding(.top, 3)
+    }
+
+    var reactionProfileAnchor: ProfileAnchor {
+        ProfileAnchor(surface: profileSurface, kind: .reaction, id: post.id)
+    }
+
+    func showReactorProfile(_ person: ReactionPerson) {
+        workspace.showProfile(ProfilePopoverRequest(userId: person.id, channelId: post.channelId), anchor: reactionProfileAnchor)
+    }
+
+    func showAllReactions(_ tab: ReactionTab) {
+        allReactionsTab = tab
+        allReactionsShown = true
     }
 
     var replyButton: some View {
@@ -330,6 +354,9 @@ struct MessageRow: View, Equatable {
         Button(post.isPinned ? "Unpin from Channel" : "Pin to Channel") { Task { await workspace.togglePin(post) } }
         if let following = model.following {
             Button(following ? "Unfollow Thread" : "Follow Thread", action: toggleFollow)
+        }
+        if !model.reactions.isEmpty && !post.isDeleted {
+            Button(ReactionText.viewAllTitle) { showAllReactions(.all) }
         }
         if model.isMine {
             Divider()
