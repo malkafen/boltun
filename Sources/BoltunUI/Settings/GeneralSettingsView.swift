@@ -18,13 +18,6 @@ public struct GeneralSettingsView: View {
                 }
                 Toggle("Show icon in the menu bar", isOn: $model.settings.showMenuBarIcon)
             }
-            Section("Notifications") {
-                Toggle("Show notifications for mentions and direct messages", isOn: $model.settings.notificationsEnabled)
-                Toggle("Play a sound", isOn: $model.settings.notificationSound)
-                    .disabled(!model.settings.notificationsEnabled)
-                Toggle("Bounce the Dock icon on mention", isOn: $model.settings.bounceDockIcon)
-                Toggle("Show unread badge on the Dock icon", isOn: $model.settings.showUnreadBadge)
-            }
             Section("Messages") {
                 Toggle(isOn: $model.settings.collapsedThreads) {
                     Text("Collapsed reply threads")

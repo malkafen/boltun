@@ -371,7 +371,7 @@ final class Workspace {
     }
 
     func markupContext() -> MarkupContext {
-        let mentionKeys = (session.me?.notifyProps["mention_keys"] ?? "").split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let mentionKeys = session.me.map(ChannelMention.keywords) ?? []
         let key = "\(session.myId)|\(session.channels.count)|\(session.customEmojis.count)|\(mentionKeys.joined(separator: ","))"
         if key == markupKey { return markupValue }
         var names: [String: String] = [:]

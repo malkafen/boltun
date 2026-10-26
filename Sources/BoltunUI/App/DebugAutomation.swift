@@ -21,6 +21,7 @@ public struct AutomationState: Codable, Equatable, Sendable {
         public var mentions: Int
         public var visiblePostCount: Int
         public var lastError: String?
+        public var notifications: String?
     }
 
     public var servers: [Server]
@@ -58,7 +59,8 @@ public struct AutomationState: Codable, Equatable, Sendable {
                 unread: unread.unread,
                 mentions: unread.mentions,
                 visiblePostCount: channelId.map { session?.timelinePosts(channelId: $0).count ?? 0 } ?? 0,
-                lastError: session?.lastError
+                lastError: session?.lastError,
+                notifications: session?.accountNotifySettings.map { Self.describe($0) }
             )
         }
         selectedServer = router.selectedIndex
@@ -70,6 +72,17 @@ public struct AutomationState: Codable, Equatable, Sendable {
         pendingThreadRootId = router.pendingThreadRootId
         fontScale = model.settings.fontScale
         lastRouteError = router.lastRouteError
+    }
+
+    static func describe(_ settings: AccountNotifySettings) -> String {
+        [
+            "desktop=\(settings.desktop.rawValue)",
+            "threads=\(settings.threadReplies)",
+            "first=\(settings.firstName)",
+            "username=\(settings.username)",
+            "channel=\(settings.channelWide)",
+            "keywords=\(settings.keywords.joined(separator: ","))",
+        ].joined(separator: " ")
     }
 
     static func describe(_ state: ConnectionState) -> String {
@@ -257,6 +270,15 @@ public final class DebugAutomation {
             return ""
         case .probe(let request):
             return try await performProbe(request)
+        case .accountNotify(let index, let change):
+            let server = try server(at: index)
+            guard let session = model.session(for: server.id), let current = session.accountNotifySettings else {
+                throw AutomationError.failed("not signed in")
+            }
+            guard await session.applyAccountNotifySettings(change.applied(to: current)) else {
+                throw AutomationError.failed(session.lastError ?? "could not save notification settings")
+            }
+            return session.accountNotifySettings.map { AutomationState.describe($0) } ?? ""
         default:
             return try await performInteraction(command)
         }

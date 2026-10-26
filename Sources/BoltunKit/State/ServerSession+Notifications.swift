@@ -47,6 +47,35 @@ extension ServerSession {
         }
     }
 
+    public var accountNotifySettings: AccountNotifySettings? {
+        me.map(AccountNotifySettings.init(user:))
+    }
+
+    @discardableResult
+    public func applyAccountNotifySettings(_ settings: AccountNotifySettings) async -> Bool {
+        guard let previous = me else { return false }
+        guard settings != AccountNotifySettings(user: previous) else { return true }
+        let props = settings.notifyProps(for: previous)
+        replaceMyNotifyProps(props)
+        do {
+            let saved = try await client.updateMyNotifyProps(props)
+            if me?.notifyProps == props, saved.id == myId {
+                me = saved
+                users[saved.id] = saved
+            }
+            return true
+        } catch {
+            if me?.notifyProps == props { replaceMyNotifyProps(previous.notifyProps) }
+            report(error)
+            return false
+        }
+    }
+
+    func replaceMyNotifyProps(_ props: [String: String]) {
+        me?.notifyProps = props
+        if !myId.isEmpty { users[myId]?.notifyProps = props }
+    }
+
     public func isMuted(teamId: String) -> Bool {
         teamLayout.isMuted(teamId)
     }

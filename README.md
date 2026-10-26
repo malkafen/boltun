@@ -49,6 +49,7 @@ The full table, the method and what is still slower in Boltun (team switches, an
 - Search, quick channel switcher
 - Native notifications and a dock badge
 - Notification control: mute a channel or conversation from the sidebar or channel menu, and per-channel notification preferences (desktop level, thread replies, ignoring `@channel`/`@here`/`@all`); muted teams can be silenced locally from the team sidebar
+- Account notification settings per server in Settings → Notifications: notify about all new messages, only mentions, direct messages and keywords, or nothing; replies to followed threads; and the keywords that trigger notifications (first name, username, `@channel`/`@all`/`@here`, custom words), synced with the server like the Mattermost web app
 - Dark theme
 
 Priority, acknowledgements and burn-on-read follow the server: their controls stay hidden where the configuration or the

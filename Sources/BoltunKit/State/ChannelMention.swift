@@ -8,11 +8,14 @@ public enum ChannelMention {
     }
 
     public static func userKeys(_ user: User) -> [String] {
-        var result = ["@" + user.username]
-        result += (user.notifyProps["mention_keys"] ?? "")
+        (["@" + user.username] + keywords(user)).filter { !$0.isEmpty && $0 != "@" }
+    }
+
+    public static func keywords(_ user: User) -> [String] {
+        var result = (user.notifyProps[AccountNotifyKey.mentionKeys] ?? "")
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
-        if user.notifyProps["first_name"] == "true" { result.append(user.firstName) }
+        if user.notifyProps[AccountNotifyKey.firstName] == "true" { result.append(user.firstName) }
         return result.filter { !$0.isEmpty && $0 != "@" }
     }
 
