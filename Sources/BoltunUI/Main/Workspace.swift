@@ -173,7 +173,10 @@ final class Workspace {
     }
 
     func select(channelId: String) async {
-        guard channelId != session.currentChannelId else { return }
+        guard channelId != session.currentChannelId else {
+            await session.markCurrentChannelViewedIfUnread()
+            return
+        }
         await session.selectChannel(channelId)
     }
 

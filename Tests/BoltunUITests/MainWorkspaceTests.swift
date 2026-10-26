@@ -459,6 +459,17 @@ func body(_ request: URLRequest) -> [String: Any] {
         #expect(workspace.channelItems(channelId: "nothing").isEmpty)
     }
 
+    @Test func selectingTheOpenChannelAgainMarksItRead() async {
+        let transport = Fixture.transport()
+        let workspace = Fixture.workspace(transport: transport)
+        await workspace.select(channelId: "town")
+        #expect(transport.requests("POST", "channels/members/me/view").isEmpty)
+        workspace.session.members["town"]?.mentionCount = 1
+        await workspace.select(channelId: "town")
+        #expect(workspace.session.unread(channelId: "town") == .none)
+        #expect(transport.requests("POST", "channels/members/me/view").count == 1)
+    }
+
     @Test func closeConversationHidesDirect() async {
         let workspace = Fixture.workspace()
         await workspace.select(channelId: "dm-alice")

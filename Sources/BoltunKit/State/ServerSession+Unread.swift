@@ -16,6 +16,17 @@ extension ServerSession {
         manuallyUnread.contains(channelId)
     }
 
+    public func markCurrentChannelViewedIfUnread() async {
+        guard let channelId = currentChannelId, !manuallyUnread.contains(channelId), hasUnreadState(channelId: channelId) else { return }
+        await markViewed(channelId: channelId)
+    }
+
+    func hasUnreadState(channelId: String) -> Bool {
+        guard let channel = channels[channelId], let member = members[channelId] else { return false }
+        return member.mentionCount > 0 || member.urgentMentionCount > 0 || quietMentions[channelId] != nil
+            || channel.totalMsgCount > member.msgCount || channel.totalMsgCountRoot > member.msgCountRoot
+    }
+
     public func updateNewMessagesAt(channelId: String, lastViewedAt: Int64) {
         guard timelines[channelId] != nil, timelines[channelId]?.lastViewedAtOnOpen != lastViewedAt else { return }
         timelines[channelId]?.lastViewedAtOnOpen = lastViewedAt
