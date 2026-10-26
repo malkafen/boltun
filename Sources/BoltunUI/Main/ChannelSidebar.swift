@@ -346,21 +346,26 @@ struct SidebarRow: View, Equatable {
 
     var emphasized: Bool { row.selected || ((row.unread || row.mentions > 0) && !row.muted) }
 
+    var dimming: Double { row.muted && !row.selected ? 0.5 : 1 }
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                icon.frame(width: 20, height: 20)
-                Text(row.title)
-                    .scaledFont(13.5, weight: emphasized && !row.selected ? .semibold : .regular)
-                    .foregroundStyle(emphasized ? Theme.sidebarTextUnread : Theme.sidebarText)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Spacer(minLength: 4)
-                if row.muted {
-                    MutedBellIcon()
+                HStack(spacing: 8) {
+                    icon.frame(width: 20, height: 20)
+                    Text(row.title)
+                        .scaledFont(13.5, weight: emphasized && !row.selected ? .semibold : .regular)
+                        .foregroundStyle(emphasized ? Theme.sidebarTextUnread : Theme.sidebarText)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer(minLength: 4)
+                    if row.muted {
+                        MutedBellIcon()
+                    }
                 }
+                .opacity(dimming)
                 if row.mentions > 0 {
-                    CountBadge(count: row.mentions, color: row.muted ? Color.white.opacity(0.25) : Theme.mentionBadge)
+                    CountBadge(count: row.mentions, color: Theme.mentionBadge)
                 }
             }
             .padding(.leading, 16)
@@ -370,7 +375,6 @@ struct SidebarRow: View, Equatable {
             .overlay(alignment: .leading) {
                 if row.selected { Rectangle().fill(Theme.accent).frame(width: 3) }
             }
-            .opacity(row.muted && !row.selected ? 0.5 : 1)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

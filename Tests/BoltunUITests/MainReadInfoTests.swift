@@ -42,6 +42,7 @@ extension Fixture {
         transport.on("DELETE", "posts/burn-out/burn", json: #"{"status":"OK"}"#)
         let workspace = workspace(transport: transport)
         let session = workspace.session
+        session.now = { Fixture.now }
         session.config = ClientConfig(values: licensedValues)
         session.license = ClientLicense(values: ["IsLicensed": "true", "SkuShortName": "entry"])
         session.channelMemberCounts["town"] = 4

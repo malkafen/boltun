@@ -133,7 +133,8 @@ import Testing
         #expect(box.items.isEmpty)
         #expect(session.members["c-dev"]?.mentionCount == 2)
         session.apply(Fixtures.posted(Fixtures.post("n3", channel: "c-dev", user: "u2", message: "@alice", createAt: 1002), mentions: ["me1"]))
-        #expect(box.items.map(\.postId) == ["n3"])
+        #expect(box.items.isEmpty)
+        #expect(session.members["c-dev"]?.mentionCount == 3)
         session.stop()
     }
 

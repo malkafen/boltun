@@ -271,7 +271,8 @@ extension ServerSession {
             myStatus: statuses[myId],
             isViewingChannel: viewing,
             isChannelWideMention: ChannelMention.isChannelWideOnly(message: post.message, user: me),
-            isQuiet: member == nil || notificationsSuppressed(teamId: teamId, channelType: channelType),
+            isTeamMuted: notificationsSuppressed(teamId: teamId, channelType: channelType),
+            isMembershipUnknown: member == nil,
             isThreadReply: collapsedThreads && post.isReply,
             isFollowingThread: followsThread(of: post)
         )
