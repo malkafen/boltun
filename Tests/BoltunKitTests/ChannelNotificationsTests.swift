@@ -453,12 +453,13 @@ import Testing
         session.onNotification = { box.items.append($0) }
         session.isAppActive = { false }
         session.members["c-beta"] = nil
-        session.apply(Fixtures.posted(Fixtures.post("n1", channel: "c-beta", user: "u2", message: "@channel deploy", createAt: 1000), team: "t2", mentions: ["me1"]))
+        session.apply(Fixtures.posted(Fixtures.post("n1", channel: "c-beta", user: "u2", message: "@alice deploy", createAt: 1000), team: "t2", mentions: ["me1"]))
         #expect(await eventually { session.members["c-beta"] != nil })
         try? await Task.sleep(for: .milliseconds(50))
         #expect(box.items.isEmpty)
+        server.transport.on("GET", "channels/c-beta/members/me", object: Fixtures.member("c-beta", user: "me1", msgCount: 0, mentions: 0))
         session.members["c-beta"] = nil
-        session.apply(Fixtures.posted(Fixtures.post("n2", channel: "c-beta", user: "u2", message: "@alice deploy", createAt: 1100), team: "t2", mentions: ["me1"]))
+        session.apply(Fixtures.posted(Fixtures.post("n2", channel: "c-beta", user: "u2", message: "@channel deploy", createAt: 1100), team: "t2", mentions: ["me1"]))
         #expect(await eventually { box.items.map(\.postId) == ["n2"] })
         session.stop()
     }
