@@ -10,7 +10,7 @@ enum AccountNotifyLabels {
         }
     }
 
-    static let levelFootnote = "Muted channels and teams only notify you when you are mentioned. Override a single channel from its Notification Preferences."
+    static let levelFootnote = "Muted channels and teams never notify you; mentions there only light up the badges. Override a single channel from its Notification Preferences."
 
     static func firstName(_ name: String) -> String {
         name.isEmpty ? "Your first name (not set on this server)" : "Your first name “\(name)”"

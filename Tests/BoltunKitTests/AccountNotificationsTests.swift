@@ -231,11 +231,11 @@ import Testing
         session.apply(Fixtures.posted(Fixtures.post("n2", channel: "c-dev", user: "u2", message: "still lunch?", createAt: 1100)))
         #expect(box.items.map(\.postId) == ["n1"])
         session.apply(Fixtures.posted(Fixtures.post("n3", channel: "c-dev", user: "u2", message: "@alice lunch?", createAt: 1200), mentions: ["me1"]))
-        #expect(box.items.map(\.postId) == ["n1", "n3"])
+        #expect(box.items.map(\.postId) == ["n1"])
         settings.desktop = .none
         #expect(await session.applyAccountNotifySettings(settings))
         session.apply(Fixtures.posted(Fixtures.post("n4", channel: "c-dm", user: "u2", message: "ping", createAt: 1300), channelType: "D", team: ""))
-        #expect(box.items.count == 2)
+        #expect(box.items.count == 1)
         session.stop()
     }
 
@@ -245,15 +245,16 @@ import Testing
         let box = NotificationBox()
         session.onNotification = { box.items.append($0) }
         session.isAppActive = { false }
-        session.members["c-dev"]?.notifyProps["mark_unread"] = "mention"
         var settings = try #require(session.accountNotifySettings)
         settings.keywords = ["deploy"]
         settings.channelWide = false
         #expect(await session.applyAccountNotifySettings(settings))
-        session.apply(Fixtures.posted(Fixtures.post("k1", channel: "c-dev", user: "u2", message: "Deploy finished", createAt: 1000)))
+        session.apply(Fixtures.posted(Fixtures.post("k1", channel: "c-dev", user: "u2", message: "Deploy finished", createAt: 1000), mentions: ["me1"]))
         #expect(box.items.map(\.postId) == ["k1"])
-        session.members["c-dev"]?.notifyProps["mark_unread"] = "all"
         session.apply(Fixtures.posted(Fixtures.post("k2", channel: "c-dev", user: "u2", message: "@here standup", createAt: 1100), mentions: ["me1"]))
+        #expect(box.items.map(\.postId) == ["k1"])
+        session.members["c-dev"]?.notifyProps["mark_unread"] = "mention"
+        session.apply(Fixtures.posted(Fixtures.post("k3", channel: "c-dev", user: "u2", message: "Deploy again", createAt: 1200), mentions: ["me1"]))
         #expect(box.items.map(\.postId) == ["k1"])
         session.stop()
     }

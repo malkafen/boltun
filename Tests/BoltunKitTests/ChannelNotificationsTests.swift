@@ -158,7 +158,8 @@ import Testing
         me: User? = nil,
         member: ChannelMember? = nil,
         channelWide: Bool = false,
-        quiet: Bool = false,
+        teamMuted: Bool = false,
+        unknown: Bool = false,
         threadReply: Bool = false,
         following: Bool = true
     ) -> Bool {
@@ -171,40 +172,44 @@ import Testing
             myStatus: .online,
             isViewingChannel: false,
             isChannelWideMention: channelWide,
-            isQuiet: quiet,
+            isTeamMuted: teamMuted,
+            isMembershipUnknown: unknown,
             isThreadReply: threadReply,
             isFollowingThread: following
         )
     }
 
-    @Test func mutedChannelsNotifyOnlyWhenTagged() {
+    @Test func mutedChannelsNeverNotifyEvenWhenTagged() {
         let muted = member(["mark_unread": "mention", "desktop": "all"])
         #expect(!notify(post(), mentioned: true, member: muted))
         #expect(!notify(post(), type: .direct, member: muted))
         #expect(!notify(post(message: "@channel deploy"), mentioned: true, member: muted, channelWide: true))
-        #expect(!notify(post(message: "@here lunch"), mentioned: true, member: muted))
-        #expect(notify(post(message: "@alice can you look?"), mentioned: true, member: muted))
-        #expect(notify(post(message: "ping @alice"), type: .direct, member: muted))
-        #expect(notify(post(message: "@alice reply", rootId: "root"), member: muted, threadReply: true, following: false))
-        #expect(!notify(post(message: "@alice"), mentioned: true, member: member(["mark_unread": "mention", "desktop": "none"])))
+        #expect(!notify(post(message: "@alice can you look?"), mentioned: true, member: muted))
+        #expect(!notify(post(message: "ping @alice"), type: .direct, member: muted))
+        #expect(!notify(post(message: "@alice reply", rootId: "root"), mentioned: true, member: muted, threadReply: true))
         #expect(notify(post(), member: member(["mark_unread": "all", "desktop": "all"])))
     }
 
-    @Test func quietChannelsNotifyOnlyWhenTagged() {
-        #expect(!notify(post(), mentioned: true, quiet: true))
-        #expect(!notify(post(), member: member(["desktop": "all"]), quiet: true))
-        #expect(!notify(post(message: "@all hands"), mentioned: true, quiet: true))
-        #expect(notify(post(message: "hey @alice"), mentioned: true, quiet: true))
-        #expect(notify(post(), mentioned: true, quiet: false))
+    @Test func mutedTeamsNeverNotifyEvenWhenTagged() {
+        #expect(!notify(post(message: "hey @alice"), mentioned: true, teamMuted: true))
+        #expect(!notify(post(), member: member(["desktop": "all"]), teamMuted: true))
+        #expect(notify(post(message: "hey @alice"), mentioned: true, teamMuted: false))
+    }
+
+    @Test func unknownMembershipNotifiesOnlyWhenTagged() {
+        #expect(!notify(post(), mentioned: true, unknown: true))
+        #expect(!notify(post(), member: member(["desktop": "all"]), unknown: true))
+        #expect(!notify(post(message: "@all hands"), mentioned: true, unknown: true))
+        #expect(notify(post(message: "hey @alice"), mentioned: true, unknown: true))
+        #expect(notify(post(), mentioned: true, unknown: false))
     }
 
     @Test func taggingHonorsMentionKeysAndDnd() {
         let keyed = User(id: "me", username: "alice", notifyProps: ["desktop": "mention", "mention_keys": "deploybot"])
-        let muted = member(["mark_unread": "mention"])
-        #expect(notify(post(message: "deploybot is down"), me: keyed, member: muted))
-        #expect(!notify(post(message: "@alicex hi"), member: muted))
+        #expect(notify(post(message: "deploybot is down"), me: keyed, unknown: true))
+        #expect(!notify(post(message: "@alicex hi"), unknown: true))
         #expect(!NotificationPolicy.shouldNotify(
-            post: post(message: "@alice"), channelType: .open, mentioned: true, me: me, member: muted, myStatus: .dnd, isViewingChannel: false
+            post: post(message: "@alice"), channelType: .open, mentioned: true, me: me, member: nil, myStatus: .dnd, isViewingChannel: false
         ))
     }
 
@@ -403,7 +408,7 @@ import Testing
         session.stop()
     }
 
-    @Test func mutedTeamsNotifyOnlyWhenTaggedButNotDirectMessages() async {
+    @Test func mutedTeamsOnlyBadgeTagsButStillNotifyDirectMessages() async {
         let session = await server().startedSession()
         let box = NotificationBox()
         session.onNotification = { box.items.append($0) }
@@ -411,18 +416,19 @@ import Testing
         session.setMuted(teamId: "t1", true)
         #expect(session.isMuted(teamId: "t1"))
         session.apply(Fixtures.posted(Fixtures.post("n0", channel: "c-dev", user: "u2", message: "@channel standup", createAt: 900), mentions: ["me1"]))
-        #expect(box.items.isEmpty)
         session.apply(Fixtures.posted(Fixtures.post("n1", channel: "c-dev", user: "u2", message: "hey @alice", createAt: 1000), mentions: ["me1"]))
-        #expect(box.items.map(\.postId) == ["n1"])
+        #expect(box.items.isEmpty)
+        #expect(await eventually { session.unread(channelId: "c-dev").mentions == 1 })
+        #expect(session.teamUnread(teamId: "t1").mentions == 1)
         session.apply(Fixtures.posted(Fixtures.post("n2", channel: "c-dm", user: "u2", message: "ping", createAt: 1100), channelType: "D", team: ""))
-        #expect(box.items.count == 2)
+        #expect(box.items.map(\.postId) == ["n2"])
         session.setMuted(teamId: "t1", false)
         session.apply(Fixtures.posted(Fixtures.post("n3", channel: "c-dev", user: "u2", message: "@channel lunch", createAt: 1200), mentions: ["me1"]))
-        #expect(box.items.count == 3)
+        #expect(box.items.map(\.postId) == ["n2", "n3"])
         session.stop()
     }
 
-    @Test func mutedChannelNotifiesOnlyWhenTaggedEndToEnd() async {
+    @Test func mutedChannelOnlyBadgesTagsEndToEnd() async {
         let session = await server().startedSession()
         let box = NotificationBox()
         session.onNotification = { box.items.append($0) }
@@ -430,9 +436,11 @@ import Testing
         session.members["c-dev"]?.notifyProps = ["mark_unread": "mention", "desktop": "all"]
         session.apply(Fixtures.posted(Fixtures.post("n1", channel: "c-dev", user: "u2", message: "release is out", createAt: 1000)))
         session.apply(Fixtures.posted(Fixtures.post("n2", channel: "c-dev", user: "u2", message: "@here standup", createAt: 1100), mentions: ["me1"]))
-        #expect(box.items.isEmpty)
+        #expect(session.unread(channelId: "c-dev").mentions == 0)
         session.apply(Fixtures.posted(Fixtures.post("n3", channel: "c-dev", user: "u2", message: "@alice please review", createAt: 1200), mentions: ["me1"]))
-        #expect(box.items.map(\.postId) == ["n3"])
+        #expect(box.items.isEmpty)
+        #expect(session.unread(channelId: "c-dev") == ChannelUnread(unread: false, mentions: 1))
+        #expect(session.totalUnread.mentions >= 1)
         session.stop()
     }
 

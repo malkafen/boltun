@@ -273,7 +273,7 @@ struct TeamTile: View, Equatable {
 
     @ViewBuilder var badge: some View {
         if tile.mentions > 0 {
-            CountBadge(count: tile.mentions, color: tile.muted ? Color.white.opacity(0.25) : Theme.mentionBadge)
+            CountBadge(count: tile.mentions, color: Theme.mentionBadge)
                 .overlay(Capsule().strokeBorder(Theme.serverRail, lineWidth: 2))
         } else if tile.unread && !tile.selected {
             Circle().fill(tile.muted ? Color.white.opacity(0.35) : Color.white).frame(width: 9, height: 9)
