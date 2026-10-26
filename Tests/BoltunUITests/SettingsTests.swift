@@ -12,8 +12,8 @@ struct SettingsTests {
     }
 
     @Test func tabsHaveTitlesAndIcons() {
-        #expect(SettingsTab.allCases.map(\.title) == ["Servers", "General", "About"])
-        #expect(Set(SettingsTab.allCases.map(\.systemImage)).count == 3)
+        #expect(SettingsTab.allCases.map(\.title) == ["Servers", "General", "Notifications", "About"])
+        #expect(Set(SettingsTab.allCases.map(\.systemImage)).count == 4)
     }
 
     @Test func togglesLaunchAtLogin() {
@@ -112,7 +112,7 @@ struct SettingsTests {
         let loginItem = FakeLoginItem()
         for tab in SettingsTab.allCases {
             router.settingsTab = tab
-            #expect(Render.png(SettingsView(model: harness.model, router: router, loginItem: loginItem), size: CGSize(width: 600, height: 520), name: "settings-\(tab.rawValue)") != nil)
+            #expect(Render.png(SettingsView(model: harness.model, router: router, loginItem: loginItem), size: CGSize(width: 600, height: 560), name: "settings-\(tab.rawValue)") != nil)
         }
     }
 

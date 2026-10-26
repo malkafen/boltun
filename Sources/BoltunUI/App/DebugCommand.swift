@@ -53,6 +53,7 @@ public enum DebugCommand: Equatable, Sendable {
     case setStatus(UserStatusValue)
     case mute(on: Bool)
     case notifyPrefs(mute: Bool?, desktop: NotificationLevel?, threads: Bool?, ignore: Bool?)
+    case accountNotify(server: Int, AccountNotifyChange)
     case teamMute(team: String, on: Bool)
     case acknowledge(index: Int, postId: String?)
     case priority(PostPriority)
@@ -85,6 +86,56 @@ public enum DebugCommand: Equatable, Sendable {
     case quickLookClose
 
     case probe(ProbeRequest)
+
+    public struct AccountNotifyChange: Equatable, Sendable {
+        public var desktop: NotificationLevel?
+        public var threads: Bool?
+        public var firstName: Bool?
+        public var username: Bool?
+        public var channelWide: Bool?
+        public var keywords: String?
+
+        public init(
+            desktop: NotificationLevel? = nil,
+            threads: Bool? = nil,
+            firstName: Bool? = nil,
+            username: Bool? = nil,
+            channelWide: Bool? = nil,
+            keywords: String? = nil
+        ) {
+            self.desktop = desktop
+            self.threads = threads
+            self.firstName = firstName
+            self.username = username
+            self.channelWide = channelWide
+            self.keywords = keywords
+        }
+
+        init?(query: [String: String]) {
+            let desktop = query["desktop"].flatMap(NotificationLevel.init(rawValue:))
+            guard query["desktop"] == nil || (desktop != nil && desktop != .default) else { return nil }
+            self.init(
+                desktop: desktop,
+                threads: query["threads"].map(DebugCommand.flag),
+                firstName: query["first"].map(DebugCommand.flag),
+                username: query["username"].map(DebugCommand.flag),
+                channelWide: query["channel"].map(DebugCommand.flag),
+                keywords: query["keywords"]
+            )
+            guard self != AccountNotifyChange() else { return nil }
+        }
+
+        public func applied(to settings: AccountNotifySettings) -> AccountNotifySettings {
+            var result = settings
+            if let desktop { result.desktop = desktop }
+            if let threads { result.threadReplies = threads }
+            if let firstName { result.firstName = firstName }
+            if let username { result.username = username }
+            if let channelWide { result.channelWide = channelWide }
+            if let keywords { result.keywords = AccountNotifySettings.parseKeywords(keywords) }
+            return result
+        }
+    }
 
     public enum TeamMoveTarget: Equatable, Sendable {
         case team(String)
@@ -153,6 +204,8 @@ public enum DebugCommand: Equatable, Sendable {
             return .notify(title: query["title"] ?? "Boltun", body: query["body"] ?? "Test notification")
         case "quit":
             return .quit
+        case "account-notify":
+            return AccountNotifyChange(query: query).map { .accountNotify(server: index(query["server"]) ?? 0, $0) }
         default:
             return makeInteraction(action: action, query: query)
         }
