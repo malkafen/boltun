@@ -295,6 +295,23 @@ struct ReadStatusPlacementTests {
         environment.mainWindow?.orderOut(nil)
     }
 
+    @Test func activationMarksTheOpenChannelRead() async throws {
+        let harness = await Harness.connected()
+        let session = try #require(harness.model.selectedSession)
+        let dock = FakeDock()
+        let environment = harness.environment(dock: dock)
+        environment.launch(startSessions: false)
+        let channelId = try #require(session.currentChannelId)
+        session.members[channelId]?.mentionCount = 3
+        environment.appDidBecomeActive()
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(session.unread(channelId: channelId).mentions == 3)
+        dock.isAppActive = true
+        environment.appDidBecomeActive()
+        #expect(await eventually { session.unread(channelId: channelId) == .none })
+        environment.mainWindow?.orderOut(nil)
+    }
+
     @Test func windowControllerReportsBecomingKey() {
         let controller = MainWindowController(rootView: Text("Boltun"), autosaveName: nil)
         var count = 0

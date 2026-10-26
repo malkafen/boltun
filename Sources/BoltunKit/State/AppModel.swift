@@ -153,8 +153,14 @@ public final class AppModel {
         settings.lastServerId = serverId
         for (id, session) in sessions where id != serverId { session.stopReadStatusPolling() }
         await restoreSelection(serverId: serverId)
+        await markSelectedChannelViewed()
         await refreshSelectedPresence()
         await refreshSelectedReadStatus()
+    }
+
+    public func markSelectedChannelViewed() async {
+        guard isAppActive(), let session = selectedSession, session.connection == .connected else { return }
+        await session.markCurrentChannelViewedIfUnread()
     }
 
     public func refreshSelectedPresence() async {

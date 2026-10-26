@@ -150,6 +150,21 @@ struct AppRouterTests {
         #expect(harness.model.selectedServerId == second.id)
     }
 
+    @Test func routingToTheOpenChannelMarksItRead() async throws {
+        let harness = await Harness.connected()
+        let server = harness.model.servers[0]
+        let router = AppRouter(model: harness.model)
+        await router.route(serverId: server.id, teamId: "t1", channelId: "c1")
+        let session = try #require(harness.model.selectedSession)
+        #expect(session.currentChannelId == "c1")
+        let viewed = harness.transport.requests(matching: "POST channels/members/me/view").count
+        session.members["c1"]?.mentionCount = 2
+        await router.route(serverId: server.id, teamId: nil, channelId: "c1")
+        #expect(session.currentChannelId == "c1")
+        #expect(session.unread(channelId: "c1") == .none)
+        #expect(harness.transport.requests(matching: "POST channels/members/me/view").count == viewed + 1)
+    }
+
     @Test func routingToSignedOutServerPresentsLogin() async {
         let server = Harness.server()
         let harness = Harness(servers: [server])

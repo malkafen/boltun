@@ -104,6 +104,7 @@ public final class AppEnvironment: AutomationHost {
         guard launched else { return }
         let model = self.model
         Task {
+            await model.markSelectedChannelViewed()
             await model.refreshSelectedPresence()
             await model.refreshSelectedReadStatus()
         }

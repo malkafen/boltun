@@ -170,8 +170,12 @@ public final class AppRouter {
         if let teamId, !teamId.isEmpty, session.teams.contains(where: { $0.id == teamId }) {
             await session.selectTeam(teamId, channelId: channelId)
         }
-        if let channelId, !channelId.isEmpty, session.currentChannelId != channelId {
-            await session.selectChannel(channelId)
+        if let channelId, !channelId.isEmpty {
+            if session.currentChannelId == channelId {
+                await session.markCurrentChannelViewedIfUnread()
+            } else {
+                await session.selectChannel(channelId)
+            }
         }
         if let rootId, !rootId.isEmpty {
             send(.openThread(rootId: rootId))
